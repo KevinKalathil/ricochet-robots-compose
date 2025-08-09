@@ -1,134 +1,186 @@
 package com.example.ricochetrobots
 
-import android.annotation.SuppressLint
-import android.os.Bundle
-import android.util.Log
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
-import com.example.ricochetrobots.ui.theme.RicochetRobotsTheme
-import kotlinx.coroutines.delay
+import androidx.compose.ui.unit.*
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
-// --- Constants ---
-private const val BOARD_ROWS = 5
-private const val BOARD_COLS = 5
-private val BOX_SIZE = 50.dp
-private val BOARD_PADDING = 10.dp
-private val BOX_PADDING = 10.dp
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.foundation.border
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
 
 class MainActivity : ComponentActivity() {
-
-    private val robotViewModel = RobotViewModel()
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-
         setContent {
-            RicochetRobotsTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Box(modifier = Modifier.padding(innerPadding)) {
-                        GameBoard(robotViewModel = robotViewModel)
-                    }
-                    Box(modifier = Modifier.padding(innerPadding)) {
-                        Robot(robotViewModel = robotViewModel)
-                    }
+            MaterialTheme {
+                Surface {
+                    AnimatedGridMovement()
                 }
             }
         }
     }
 }
 
-@SuppressLint("UseOfNonLambdaOffsetOverload")
+
 @Composable
-fun Robot(robotViewModel: RobotViewModel) {
-    val boardSize by robotViewModel.gameBoardSize.collectAsState()
-    val robotState by robotViewModel.robotState.collectAsState()
-    val shift = BOARD_PADDING.value + BOX_PADDING.value
+fun AnimatedGridMovement() {
+    val columns = 8
+    val rows = 16
+    var boardSizePx by remember { mutableStateOf(IntSize.Zero) }
+    val coroutineScope = rememberCoroutineScope()
 
-    if (boardSize.widthDp > 0.dp && boardSize.heightDp > 0.dp) {
-        val colShift = (boardSize.widthDp - (shift/2).dp) / BOARD_COLS
-        val rowShift = (boardSize.heightDp - (shift/2).dp ) / BOARD_ROWS
-
-        val animatedX = remember {
-            Animatable((robotState.gridPosCol * colShift.value) + shift)
+    // Create and remember multiple robots
+    val robots = remember {
+        List(3) { index -> // For example, 3 robots
+            RobotState(id = index)
         }
-        val animatedY = remember {
-            Animatable((robotState.gridPosRow * rowShift.value) + shift)
-        }
+    }
 
-        LaunchedEffect(Unit) {
-            delay(2000)
-            robotViewModel.moveTo(1, 1)
-            delay(2000)
-            robotViewModel.moveTo(0, 0)
-        }
+    // Move function for each robot
+    fun moveRobot(robotId: Int, newPos: Offset) {
+        val robot = robots.first { it.id == robotId }
+        if (robot.animProgress.isRunning) return
 
-        LaunchedEffect(robotState) {
-            val targetX = (robotState.gridPosCol * colShift.value) + shift
-            val targetY = (robotState.gridPosRow * rowShift.value) + shift
-            animatedX.animateTo(targetX, tween(durationMillis = 500))
-            animatedY.animateTo(targetY, tween(durationMillis = 500))
+        coroutineScope.launch {
+            robot.currentPos.value = robot.targetPos.value
+            robot.targetPos.value = newPos
+            robot.animProgress.snapTo(0f)
+            robot.animProgress.animateTo(1f, animationSpec = tween(durationMillis = 300))
         }
+    }
 
+    Column(
+        Modifier
+            .fillMaxSize()
+            .padding(WindowInsets.safeDrawing.asPaddingValues())
+    ) {
         Box(
-            modifier = Modifier
-                .offset(animatedX.value.dp, animatedY.value.dp)
-                .size(BOX_SIZE)
-                .background(Color.Red)
-        )
+            Modifier
+                .padding(20.dp)
+                .weight(1f)
+                .fillMaxWidth()
+                .aspectRatio(0.5f)
+                .onGloballyPositioned { coordinates -> boardSizePx = coordinates.size }
+                .background(Color.LightGray),
+            contentAlignment = Alignment.TopStart
+        ) {
+            GameBoard(rows, columns)
+
+            if (boardSizePx.width > 0 && boardSizePx.height > 0) {
+                val cellWidthPx = boardSizePx.width.toFloat() / columns
+                val cellHeightPx = boardSizePx.height.toFloat() / rows
+
+                // Draw each robot
+                robots.forEach { robot ->
+                    Robot(
+                        animProgress = robot.animProgress,
+                        currentPos = robot.currentPos.value,
+                        targetPos = robot.targetPos.value,
+                        cellWidthPx = cellWidthPx,
+                        cellHeightPx = cellHeightPx
+                    )
+                }
+            }
+        }
+
+        // Example Controls for the first robot (id=0)
+        robots.forEachIndexed { index, robot ->
+            Controls(
+                targetPos = robot.targetPos.value,
+                rows = rows,
+                columns = columns,
+                moveTo = { newPos -> moveRobot(index, newPos) }
+            )
+        }
     }
 }
 
+
 @Composable
-fun GameBoard(robotViewModel: RobotViewModel) {
+fun Robot(animProgress: Animatable<Float, AnimationVector1D>, currentPos: Offset, targetPos: Offset, cellWidthPx: Float, cellHeightPx: Float) {
     val density = LocalDensity.current
+    val animatedX = ((1 - animProgress.value) * currentPos.x + animProgress.value * targetPos.x) * cellWidthPx
+    val animatedY = ((1 - animProgress.value) * currentPos.y + animProgress.value * targetPos.y) * cellHeightPx
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(BOARD_PADDING)
-                .onGloballyPositioned { coordinates ->
-                    val sizePx = coordinates.size
-                    val sizeDpWidth = with(density) { sizePx.width.toDp() }
-                    val sizeDpHeight = with(density) { sizePx.height.toDp() }
-                    Log.d(
-                        "kevin",
-                        "${sizePx.width} x ${sizePx.height} $sizeDpHeight x $sizeDpWidth "
-                    )
+        Modifier
+            .offset { IntOffset(animatedX.roundToInt(), animatedY.roundToInt()) }
+            .size(with(density) { cellWidthPx.toDp() }, with(density) { cellHeightPx.toDp() })
+            .padding(6.dp)
+            .background(Color.Red)
+    )
+}
 
-                    robotViewModel.setNewBoardSize(sizeDpWidth, sizeDpHeight)
-                }
-        ) {
-            repeat(BOARD_ROWS) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.Blue)
-                        .padding(BOX_PADDING),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    repeat(BOARD_COLS) {
+@Composable
+fun Controls(
+    targetPos: Offset,
+    rows: Int,
+    columns: Int,
+    moveTo: (Offset) -> Unit
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Button(onClick = {
+            val newX = (targetPos.x - 1).coerceAtLeast(0f)
+            val newY = targetPos.y
+            moveTo(Offset(newX, newY))
+        }) { Text("Left") }
+
+        Button(onClick = {
+            val newX = (targetPos.x + 1).coerceAtMost(columns - 1f)
+            val newY = targetPos.y
+            moveTo(Offset(newX, newY))
+        }) { Text("Right") }
+
+        Button(onClick = {
+            val newX = targetPos.x
+            val newY = (targetPos.y - 1).coerceAtLeast(0f)
+            moveTo(Offset(newX, newY))
+        }) { Text("Up") }
+
+        Button(onClick = {
+            val newX = targetPos.x
+            val newY = (targetPos.y + 1).coerceAtMost(rows - 1f)
+            moveTo(Offset(newX, newY))
+        }) { Text("Down") }
+    }
+}
+
+
+@Composable
+fun GameBoard(rows: Int, columns: Int, modifier: Modifier = Modifier) {
+    BoxWithConstraints(modifier = modifier) {
+        // maxWidth is the total available width for the board
+        val cellSize = maxWidth / columns
+
+        Column {
+            repeat(rows) {
+                Row {
+                    repeat(columns) {
                         Box(
                             modifier = Modifier
-                                .size(BOX_SIZE)
-                                .aspectRatio(1f)
+                                .size(cellSize)
                                 .background(Color.Cyan)
+                                .border(1.dp, Color.Black)
                         )
                     }
                 }
@@ -136,3 +188,5 @@ fun GameBoard(robotViewModel: RobotViewModel) {
         }
     }
 }
+
+
