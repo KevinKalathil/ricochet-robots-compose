@@ -1,3 +1,5 @@
+package com.example.ricochetrobots
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.runtime.MutableState
@@ -18,7 +20,7 @@ data class RobotState(
 
 class RobotViewModel : ViewModel() {
     val columns = 8
-    val rows = 16
+    val rows = 12
     var robots by mutableStateOf(
         List(3) { index ->
             RobotState(id = index)

@@ -1,6 +1,6 @@
 package com.example.ricochetrobots
 
-import RobotViewModel
+import android.annotation.SuppressLint
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
 }
 
 
+@SuppressLint("Range")
 @Composable
 fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
 
@@ -88,7 +89,7 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
                 .padding(20.dp)
                 .weight(1f)
                 .fillMaxWidth()
-                .aspectRatio(0.5f)
+                .aspectRatio(robotViewModel.columns.toFloat() / robotViewModel.rows.toFloat())
                 .onGloballyPositioned { coordinates -> boardSizePx = coordinates.size }
                 .background(Color.LightGray),
             contentAlignment = Alignment.TopStart
@@ -156,7 +157,6 @@ fun Robot(
     )
 }
 
-
 @Composable
 fun Controls(
     robotViewModel: RobotViewModel,
@@ -209,7 +209,7 @@ fun GameBoard(rows: Int, columns: Int, modifier: Modifier = Modifier) {
                         Box(
                             modifier = Modifier
                                 .size(cellSize)
-                                .background(Color.Cyan)
+                                .background(Color.White)
                                 .border(1.dp, Color.Black)
                         )
                     }
