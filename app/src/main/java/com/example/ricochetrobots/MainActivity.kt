@@ -1,5 +1,6 @@
 package com.example.ricochetrobots
 
+import RobotViewModel
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.AnimationVector1D
@@ -26,12 +28,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
 
 class MainActivity : ComponentActivity() {
+
+    private val robotViewModel: RobotViewModel = RobotViewModel()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
                 Surface {
-                    AnimatedGridMovement()
+                    AnimatedGridMovement(robotViewModel)
                 }
             }
         }
@@ -40,21 +45,17 @@ class MainActivity : ComponentActivity() {
 
 
 @Composable
-fun AnimatedGridMovement() {
+fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
     val columns = 8
     val rows = 16
     var boardSizePx by remember { mutableStateOf(IntSize.Zero) }
     val coroutineScope = rememberCoroutineScope()
-
-    // Create and remember multiple robots
-    val robots = remember {
-        List(3) { index -> // For example, 3 robots
-            RobotState(id = index)
-        }
-    }
+    val robots = robotViewModel.robots
 
     // Move function for each robot
     fun moveRobot(robotId: Int, newPos: Offset) {
+
+        Log.d("kevin robot pos", "robot id: $robotId, new positon: ${newPos.x}, ${newPos.y}")
         val robot = robots.first { it.id == robotId }
         if (robot.animProgress.isRunning) return
 
