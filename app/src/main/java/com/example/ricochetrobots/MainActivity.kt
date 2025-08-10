@@ -47,16 +47,17 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
-    val columns = 8
-    val rows = 16
-    var boardSizePx by remember { mutableStateOf(IntSize.Zero) }
-    val coroutineScope = rememberCoroutineScope()
+
     val robots = robotViewModel.robots
+    val coroutineScope = rememberCoroutineScope()
+
+    var boardSizePx by remember { mutableStateOf(IntSize.Zero) }
 
     // Move function for each robot
     fun moveRobot(robotId: Int, newPos: Offset) {
 
         Log.d("kevin robot pos", "robot id: $robotId, new positon: ${newPos.x}, ${newPos.y}")
+
         val robot = robots.first { it.id == robotId }
         if (robot.animProgress.isRunning) return
 
@@ -65,6 +66,15 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
             robot.targetPos.value = newPos
             robot.animProgress.snapTo(0f)
             robot.animProgress.animateTo(1f, animationSpec = tween(durationMillis = 300))
+
+            // Log all robot positions after updating
+            robots.forEach { r ->
+                Log.d(
+                    "kevin all robots",
+                    "robot ${r.id}: current=(${r.currentPos.value.x}, ${r.currentPos.value.y}), " +
+                            "target=(${r.targetPos.value.x}, ${r.targetPos.value.y})"
+                )
+            }
         }
     }
 
@@ -83,11 +93,11 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
                 .background(Color.LightGray),
             contentAlignment = Alignment.TopStart
         ) {
-            GameBoard(rows, columns)
+            GameBoard(robotViewModel.rows, robotViewModel.columns)
 
             if (boardSizePx.width > 0 && boardSizePx.height > 0) {
-                val cellWidthPx = boardSizePx.width.toFloat() / columns
-                val cellHeightPx = boardSizePx.height.toFloat() / rows
+                val cellWidthPx = boardSizePx.width.toFloat() / robotViewModel.columns
+                val cellHeightPx = boardSizePx.height.toFloat() / robotViewModel.rows
 
                 // Draw each robot
                 robots.forEach { robot ->
@@ -106,15 +116,18 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
             }
         }
 
-        val selectedRobot = robotViewModel.robots.firstOrNull { it.isSelected.value } ?: robotViewModel.robots.first()
+        val selectedRobot = robotViewModel.getSelectedRobot()
 
         // Example Controls for the first robot (id=0)
-        Controls(
-            targetPos = selectedRobot.targetPos.value,
-            rows = rows,
-            columns = columns,
-            moveTo = { newPos -> moveRobot(selectedRobot.id, newPos) }
-        )
+        selectedRobot?.targetPos?.let {
+            Controls(
+                targetPos = it.value,
+                rows = robotViewModel.rows,
+                columns = robotViewModel.columns,
+                moveTo = { newPos -> moveRobot(selectedRobot.id, newPos) },
+                robotViewModel = robotViewModel
+            )
+        }
     }
 }
 
@@ -146,6 +159,7 @@ fun Robot(
 
 @Composable
 fun Controls(
+    robotViewModel: RobotViewModel,
     targetPos: Offset,
     rows: Int,
     columns: Int,
@@ -156,27 +170,27 @@ fun Controls(
         modifier = Modifier.fillMaxWidth()
     ) {
         Button(onClick = {
-            val newX = (targetPos.x - 1).coerceAtLeast(0f)
+            val newX = (robotViewModel.getLeftmostAvailableBox())?.coerceAtLeast(0f)
             val newY = targetPos.y
-            moveTo(Offset(newX, newY))
+            moveTo(Offset(newX ?: 0f, newY))
         }) { Text("Left") }
 
         Button(onClick = {
-            val newX = (targetPos.x + 1).coerceAtMost(columns - 1f)
+            val newX = (robotViewModel.getRightmostAvailableBox())?.coerceAtMost(columns - 1f)
             val newY = targetPos.y
-            moveTo(Offset(newX, newY))
+            moveTo(Offset(newX ?: 0f, newY))
         }) { Text("Right") }
 
         Button(onClick = {
             val newX = targetPos.x
-            val newY = (targetPos.y - 1).coerceAtLeast(0f)
-            moveTo(Offset(newX, newY))
+            val newY = (robotViewModel.getTopmostAvailableBox())?.coerceAtLeast(0f)
+            moveTo(Offset(newX, newY ?: 0f))
         }) { Text("Up") }
 
         Button(onClick = {
             val newX = targetPos.x
-            val newY = (targetPos.y + 1).coerceAtMost(rows - 1f)
-            moveTo(Offset(newX, newY))
+            val newY = (robotViewModel.getBottommostAvailableBox())?.coerceAtMost(rows - 1f)
+            moveTo(Offset(newX, newY ?: 0f))
         }) { Text("Down") }
     }
 }
