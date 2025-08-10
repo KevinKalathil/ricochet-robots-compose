@@ -23,6 +23,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
@@ -70,7 +71,7 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
     Column(
         Modifier
             .fillMaxSize()
-            .padding(WindowInsets.safeDrawing.asPaddingValues())
+            .padding(10.dp)
     ) {
         Box(
             Modifier
@@ -95,27 +96,39 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
                         currentPos = robot.currentPos.value,
                         targetPos = robot.targetPos.value,
                         cellWidthPx = cellWidthPx,
-                        cellHeightPx = cellHeightPx
-                    )
+                        cellHeightPx = cellHeightPx,
+                        isSelected = robot.isSelected.value
+                    ) {
+                        robots.forEach { it.isSelected.value = false }
+                        robot.isSelected.value = true
+                    }
                 }
             }
         }
 
+        val selectedRobot = robotViewModel.robots.firstOrNull { it.isSelected.value } ?: robotViewModel.robots.first()
+
         // Example Controls for the first robot (id=0)
-        robots.forEachIndexed { index, robot ->
-            Controls(
-                targetPos = robot.targetPos.value,
-                rows = rows,
-                columns = columns,
-                moveTo = { newPos -> moveRobot(index, newPos) }
-            )
-        }
+        Controls(
+            targetPos = selectedRobot.targetPos.value,
+            rows = rows,
+            columns = columns,
+            moveTo = { newPos -> moveRobot(selectedRobot.id, newPos) }
+        )
     }
 }
 
 
 @Composable
-fun Robot(animProgress: Animatable<Float, AnimationVector1D>, currentPos: Offset, targetPos: Offset, cellWidthPx: Float, cellHeightPx: Float) {
+fun Robot(
+    animProgress: Animatable<Float, AnimationVector1D>,
+    currentPos: Offset,
+    targetPos: Offset,
+    cellWidthPx: Float,
+    cellHeightPx: Float,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
     val density = LocalDensity.current
     val animatedX = ((1 - animProgress.value) * currentPos.x + animProgress.value * targetPos.x) * cellWidthPx
     val animatedY = ((1 - animProgress.value) * currentPos.y + animProgress.value * targetPos.y) * cellHeightPx
@@ -125,9 +138,11 @@ fun Robot(animProgress: Animatable<Float, AnimationVector1D>, currentPos: Offset
             .offset { IntOffset(animatedX.roundToInt(), animatedY.roundToInt()) }
             .size(with(density) { cellWidthPx.toDp() }, with(density) { cellHeightPx.toDp() })
             .padding(6.dp)
-            .background(Color.Red)
+            .background(if (isSelected) Color.Green else Color.Red) // optional visual feedback
+            .clickable { onClick() }
     )
 }
+
 
 @Composable
 fun Controls(

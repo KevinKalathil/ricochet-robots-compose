@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 
 data class RobotState(
     val id: Int,
+    var isSelected: MutableState<Boolean> = mutableStateOf(false),
     val currentPos: MutableState<Offset> = mutableStateOf(Offset.Zero),
     val targetPos: MutableState<Offset> = mutableStateOf(Offset.Zero),
     val animProgress: Animatable<Float, AnimationVector1D> = Animatable(1f)
@@ -23,7 +24,11 @@ class RobotViewModel : ViewModel() {
     )
         private set
 
-    fun generateRandomPositions() {
+    init {
+        generateRandomPositions()
+    }
+
+    private fun generateRandomPositions() {
         robots.forEach { robot ->
             robot.currentPos.value = Offset(
                 x = (0..7).random().toFloat(),
