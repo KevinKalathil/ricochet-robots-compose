@@ -27,6 +27,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.drawBehind
 
 class MainActivity : ComponentActivity() {
 
@@ -94,11 +95,11 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
                 .background(Color.LightGray),
             contentAlignment = Alignment.TopStart
         ) {
-            GameBoard(robotViewModel.rows, robotViewModel.columns)
-
+            GameBoard(robotViewModel.rows, robotViewModel.columns, robotViewModel.tileBlockState.gridState.value)
             if (boardSizePx.width > 0 && boardSizePx.height > 0) {
                 val cellWidthPx = boardSizePx.width.toFloat() / robotViewModel.columns
                 val cellHeightPx = boardSizePx.height.toFloat() / robotViewModel.rows
+                Target(robotViewModel.targetPos.value, cellWidthPx = cellWidthPx, cellHeightPx = cellHeightPx)
 
                 // Draw each robot
                 robots.forEach { robot ->
@@ -152,9 +153,28 @@ fun Robot(
             .offset { IntOffset(animatedX.roundToInt(), animatedY.roundToInt()) }
             .size(with(density) { cellWidthPx.toDp() }, with(density) { cellHeightPx.toDp() })
             .padding(6.dp)
-            .background(if (isSelected) Color.Green else Color.Red) // optional visual feedback
+            .background(if (isSelected) Color.Green else Color.Red)
             .clickable { onClick() }
     )
+}
+
+@Composable
+fun Target(
+    pos: Offset,
+    cellWidthPx: Float,
+    cellHeightPx: Float,
+) {
+    val density = LocalDensity.current
+    val offsetX = (pos.x * cellWidthPx).toInt()
+    val offsetY = (pos.y * cellHeightPx).toInt()
+    Box(
+        Modifier
+            .offset { IntOffset(offsetX, offsetY) }
+            .size(with(density) { cellWidthPx.toDp() }, with(density) { cellHeightPx.toDp() })
+            .padding(6.dp)
+            .background(Color.Blue)
+    )
+
 }
 
 @Composable
@@ -165,57 +185,111 @@ fun Controls(
     columns: Int,
     moveTo: (Offset) -> Unit
 ) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Button(onClick = {
-            val newX = (robotViewModel.getLeftmostAvailableBox())?.coerceAtLeast(0f)
-            val newY = targetPos.y
-            moveTo(Offset(newX ?: 0f, newY))
-        }) { Text("Left") }
+    Column {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Button(onClick = {
+                val newX = (robotViewModel.getLeftmostAvailableBox())?.coerceAtLeast(0f)
+                val newY = targetPos.y
+                moveTo(Offset(newX ?: 0f, newY))
+            }) { Text("Left") }
 
-        Button(onClick = {
-            val newX = (robotViewModel.getRightmostAvailableBox())?.coerceAtMost(columns - 1f)
-            val newY = targetPos.y
-            moveTo(Offset(newX ?: 0f, newY))
-        }) { Text("Right") }
+            Button(onClick = {
+                val newX = (robotViewModel.getRightmostAvailableBox())?.coerceAtMost(columns - 1f)
+                val newY = targetPos.y
+                moveTo(Offset(newX ?: 0f, newY))
+            }) { Text("Right") }
 
-        Button(onClick = {
-            val newX = targetPos.x
-            val newY = (robotViewModel.getTopmostAvailableBox())?.coerceAtLeast(0f)
-            moveTo(Offset(newX, newY ?: 0f))
-        }) { Text("Up") }
+            Button(onClick = {
+                val newX = targetPos.x
+                val newY = (robotViewModel.getTopmostAvailableBox())?.coerceAtLeast(0f)
+                moveTo(Offset(newX, newY ?: 0f))
+            }) { Text("Up") }
 
+            Button(onClick = {
+                val newX = targetPos.x
+                val newY = (robotViewModel.getBottommostAvailableBox())?.coerceAtMost(rows - 1f)
+                moveTo(Offset(newX, newY ?: 0f))
+            }) { Text("Down") }
+
+        }
         Button(onClick = {
-            val newX = targetPos.x
-            val newY = (robotViewModel.getBottommostAvailableBox())?.coerceAtMost(rows - 1f)
-            moveTo(Offset(newX, newY ?: 0f))
-        }) { Text("Down") }
+            robotViewModel.generateRandomTileBlocks()
+        }) { Text("Regen Board") }
+
     }
 }
 
 
 @Composable
-fun GameBoard(rows: Int, columns: Int, modifier: Modifier = Modifier) {
-    BoxWithConstraints(modifier = modifier) {
+fun GameBoard(rows: Int, columns: Int, tileBlockState: Array<Array<Int>>) {
+    BoxWithConstraints(modifier = Modifier) {
         // maxWidth is the total available width for the board
         val cellSize = maxWidth / columns
 
         Column {
-            repeat(rows) {
+            repeat(rows) { rowIndex ->
                 Row {
-                    repeat(columns) {
+                    repeat(columns) { colIndex ->
+                        val value = tileBlockState[rowIndex][colIndex]
+
                         Box(
                             modifier = Modifier
                                 .size(cellSize)
                                 .background(Color.White)
-                                .border(1.dp, Color.Black)
+                                .drawBehind {
+                                    val strokeWidth = 8f
+                                    val isTopWallBlocked = (value and 1) != 0
+                                    val isRightWallBlocked = (value and 2) != 0
+                                    val isBottomWallBlocked = (value and 4) != 0
+                                    val isLeftWallBlocked = (value and 8) != 0
+
+                                    // Top wall: draw if top row or top wall exists
+                                    if (isTopWallBlocked) {
+                                        drawLine(
+                                            color = Color.Black,
+                                            start = Offset(0f, 0f),
+                                            end = Offset(size.width, 0f),
+                                            strokeWidth = strokeWidth
+                                        )
+                                    }
+                                    // Right wall: only draw if rightmost column OR adjacent cell to the right doesn't have left wall
+                                    if (isRightWallBlocked) {
+                                        drawLine(
+                                            color = Color.Black,
+                                            start = Offset(size.width, 0f),
+                                            end = Offset(size.width, size.height),
+                                            strokeWidth = strokeWidth
+                                        )
+                                    }
+                                    // Bottom wall: only draw if bottom row OR adjacent cell above doesn't have bottom wall
+                                    if (isBottomWallBlocked) {
+                                        drawLine(
+                                            color = Color.Black,
+                                            start = Offset(0f, size.height),
+                                            end = Offset(size.width, size.height),
+                                            strokeWidth = strokeWidth
+                                        )
+                                    }
+                                    // Left wall: draw if left column or left wall exists
+                                    if (isLeftWallBlocked) {
+                                        drawLine(
+                                            color = Color.Black,
+                                            start = Offset(0f, 0f),
+                                            end = Offset(0f, size.height),
+                                            strokeWidth = strokeWidth
+                                        )
+                                    }
+                                }
                         )
+
                     }
                 }
             }
         }
+
     }
 }
 
