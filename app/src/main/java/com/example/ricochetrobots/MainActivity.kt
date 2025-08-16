@@ -28,6 +28,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.Stroke
 
 class MainActivity : ComponentActivity() {
 
@@ -191,26 +193,31 @@ fun Controls(
             modifier = Modifier.fillMaxWidth()
         ) {
             Button(onClick = {
-                val newX = (robotViewModel.getLeftmostAvailableBox())?.coerceAtLeast(0f)
+                val newPosition = (robotViewModel.getNextAvailableBox(Direction.Left))
+                val newX = newPosition?.x?.coerceAtLeast(0f)
                 val newY = targetPos.y
                 moveTo(Offset(newX ?: 0f, newY))
             }) { Text("Left") }
 
             Button(onClick = {
-                val newX = (robotViewModel.getRightmostAvailableBox())?.coerceAtMost(columns - 1f)
+                val newPosition = (robotViewModel.getNextAvailableBox(Direction.Right))
+                val newX = newPosition?.x?.coerceAtMost(columns - 1f)
                 val newY = targetPos.y
                 moveTo(Offset(newX ?: 0f, newY))
             }) { Text("Right") }
 
             Button(onClick = {
+                val newPosition = (robotViewModel.getNextAvailableBox(Direction.Up))
                 val newX = targetPos.x
-                val newY = (robotViewModel.getTopmostAvailableBox())?.coerceAtLeast(0f)
+                val newY = newPosition?.y?.coerceAtLeast(0f)
                 moveTo(Offset(newX, newY ?: 0f))
             }) { Text("Up") }
 
             Button(onClick = {
+                val newPosition = (robotViewModel.getNextAvailableBox(Direction.Down))
                 val newX = targetPos.x
-                val newY = (robotViewModel.getBottommostAvailableBox())?.coerceAtMost(rows - 1f)
+                val newY = newPosition?.y?.coerceAtMost(rows - 1f)
+
                 moveTo(Offset(newX, newY ?: 0f))
             }) { Text("Down") }
 
@@ -238,18 +245,25 @@ fun GameBoard(rows: Int, columns: Int, tileBlockState: Array<Array<Int>>) {
                         Box(
                             modifier = Modifier
                                 .size(cellSize)
-                                .background(Color.White)
-                                .drawBehind {
-                                    val strokeWidth = 8f
+                                .background(Color.Black)
+//                                .border(2.dp, Color.LightGray)
+                                .drawWithContent {
+                                    drawRect(
+                                        color = Color.LightGray,
+                                        style = Stroke(width = 4f)
+                                    )
+                                    val strokeWidth = 15f
                                     val isTopWallBlocked = (value and 1) != 0
                                     val isRightWallBlocked = (value and 2) != 0
                                     val isBottomWallBlocked = (value and 4) != 0
                                     val isLeftWallBlocked = (value and 8) != 0
 
+                                    val borderColor = Color.Magenta
+
                                     // Top wall: draw if top row or top wall exists
                                     if (isTopWallBlocked) {
                                         drawLine(
-                                            color = Color.Black,
+                                            color = borderColor,
                                             start = Offset(0f, 0f),
                                             end = Offset(size.width, 0f),
                                             strokeWidth = strokeWidth
@@ -258,7 +272,7 @@ fun GameBoard(rows: Int, columns: Int, tileBlockState: Array<Array<Int>>) {
                                     // Right wall: only draw if rightmost column OR adjacent cell to the right doesn't have left wall
                                     if (isRightWallBlocked) {
                                         drawLine(
-                                            color = Color.Black,
+                                            color = borderColor,
                                             start = Offset(size.width, 0f),
                                             end = Offset(size.width, size.height),
                                             strokeWidth = strokeWidth
@@ -267,7 +281,7 @@ fun GameBoard(rows: Int, columns: Int, tileBlockState: Array<Array<Int>>) {
                                     // Bottom wall: only draw if bottom row OR adjacent cell above doesn't have bottom wall
                                     if (isBottomWallBlocked) {
                                         drawLine(
-                                            color = Color.Black,
+                                            color = borderColor,
                                             start = Offset(0f, size.height),
                                             end = Offset(size.width, size.height),
                                             strokeWidth = strokeWidth
@@ -276,7 +290,7 @@ fun GameBoard(rows: Int, columns: Int, tileBlockState: Array<Array<Int>>) {
                                     // Left wall: draw if left column or left wall exists
                                     if (isLeftWallBlocked) {
                                         drawLine(
-                                            color = Color.Black,
+                                            color = borderColor,
                                             start = Offset(0f, 0f),
                                             end = Offset(0f, size.height),
                                             strokeWidth = strokeWidth

@@ -26,12 +26,13 @@ data class TileBlockState(
     val gridState: MutableState<Array<Array<Int>>> = mutableStateOf(emptyArray()),
 )
 
-enum class Direction {
-    Right,
-    Left,
-    Up,
-    Down
+enum class Direction(val dx: Int, val dy: Int) {
+    Right(1, 0),
+    Left(-1, 0),
+    Up(0, -1),
+    Down(0, 1);
 }
+
 
 class RobotViewModel : ViewModel() {
     val columns = 10
@@ -177,50 +178,67 @@ class RobotViewModel : ViewModel() {
         return (noRobotsInSpace and !isWallBlocking)
     }
 
-
-    fun getRightmostAvailableBox(gridWidth: Int = columns): Float? {
+    fun getNextAvailableBox(direction: Direction): Offset? {
         val robot = getSelectedRobot() ?: return null
         var x = robot.targetPos.value.x.toInt()
-        val y = robot.targetPos.value.y.toInt()
+        var y = robot.targetPos.value.y.toInt()
+
+        val deltaX = direction.dx
+        val deltaY = direction.dy
 
         // Move right until blocked or end of grid
-        while (x + 1 < gridWidth && isPositionFree(x + 1, y, robot.id, Direction.Right)) {
-            x++
+        while (x + deltaX < columns && y + deltaY < rows && isPositionFree(x + deltaX, y + deltaY, robot.id, direction)) {
+            x += deltaX
+            y += deltaY
         }
-        return x.toFloat()
+
+        return Offset(x.toFloat(), y.toFloat())
     }
 
-    fun getLeftmostAvailableBox(): Float? {
-        val robot = getSelectedRobot() ?: return null
-        var x = robot.targetPos.value.x.toInt()
-        val y = robot.targetPos.value.y.toInt()
 
-        while (x - 1 >= 0 && isPositionFree(x - 1, y, robot.id, Direction.Left)) {
-            x--
-        }
-        return x.toFloat()
-    }
-
-    fun getTopmostAvailableBox(): Float? {
-        val robot = getSelectedRobot() ?: return null
-        val x = robot.targetPos.value.x.toInt()
-        var y = robot.targetPos.value.y.toInt()
-
-        while (y - 1 >= 0 && isPositionFree(x, y - 1, robot.id, Direction.Up)) {
-            y--
-        }
-        return y.toFloat()
-    }
-
-    fun getBottommostAvailableBox(gridHeight: Int = rows): Float? {
-        val robot = getSelectedRobot() ?: return null
-        val x = robot.targetPos.value.x.toInt()
-        var y = robot.targetPos.value.y.toInt()
-
-        while (y + 1 < gridHeight && isPositionFree(x, y + 1, robot.id, Direction.Down)) {
-            y++
-        }
-        return y.toFloat()
-    }
+//    fun getRightmostAvailableBox(): Float? {
+//        val robot = getSelectedRobot() ?: return null
+//        var x = robot.targetPos.value.x.toInt()
+//        val y = robot.targetPos.value.y.toInt()
+//
+//        // Move right until blocked or end of grid
+//        while (x + 1 < columns && isPositionFree(x + 1, y, robot.id, Direction.Right)) {
+//            x++
+//        }
+//        return x.toFloat()
+//    }
+//
+//    fun getLeftmostAvailableBox(): Float? {
+//        val robot = getSelectedRobot() ?: return null
+//        var x = robot.targetPos.value.x.toInt()
+//        val y = robot.targetPos.value.y.toInt()
+//
+//        while (x - 1 >= 0 && isPositionFree(x - 1, y, robot.id, Direction.Left)) {
+//            x--
+//        }
+//        return x.toFloat()
+//    }
+//
+//    fun getTopmostAvailableBox(): Float? {
+//        val robot = getSelectedRobot() ?: return null
+//        val x = robot.targetPos.value.x.toInt()
+//        var y = robot.targetPos.value.y.toInt()
+//
+//        while (y - 1 >= 0 && isPositionFree(x, y - 1, robot.id, Direction.Up)) {
+//            y--
+//        }
+//        return y.toFloat()
+//    }
+//
+//    fun getBottommostAvailableBox(): Float? {
+//        val robot = getSelectedRobot() ?: return null
+//        val x = robot.targetPos.value.x.toInt()
+//        var y = robot.targetPos.value.y.toInt()
+//
+//        while (y + 1 < rows && isPositionFree(x, y + 1, robot.id, Direction.Down)) {
+//            y++
+//        }
+//        return y.toFloat()
+//    }
 }
 
