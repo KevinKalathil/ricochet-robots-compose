@@ -22,12 +22,10 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.Stroke
 
@@ -66,7 +64,7 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
         if (robot.animProgress.isRunning) return
 
         coroutineScope.launch {
-            robot.currentPos.value = robot.targetPos.value
+            robot.prevPos.value = robot.targetPos.value
             robot.targetPos.value = newPos
             robot.animProgress.snapTo(0f)
             robot.animProgress.animateTo(1f, animationSpec = tween(durationMillis = 300))
@@ -75,7 +73,7 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
             robots.forEach { r ->
                 Log.d(
                     "kevin all robots",
-                    "robot ${r.id}: current=(${r.currentPos.value.x}, ${r.currentPos.value.y}), " +
+                    "robot ${r.id}: current=(${r.prevPos.value.x}, ${r.prevPos.value.y}), " +
                             "target=(${r.targetPos.value.x}, ${r.targetPos.value.y})"
                 )
             }
@@ -107,7 +105,7 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
                 robots.forEach { robot ->
                     Robot(
                         animProgress = robot.animProgress,
-                        currentPos = robot.currentPos.value,
+                        prevPos = robot.prevPos.value,
                         targetPos = robot.targetPos.value,
                         cellWidthPx = cellWidthPx,
                         cellHeightPx = cellHeightPx,
@@ -139,7 +137,7 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
 @Composable
 fun Robot(
     animProgress: Animatable<Float, AnimationVector1D>,
-    currentPos: Offset,
+    prevPos: Offset,
     targetPos: Offset,
     cellWidthPx: Float,
     cellHeightPx: Float,
@@ -147,8 +145,8 @@ fun Robot(
     onClick: () -> Unit
 ) {
     val density = LocalDensity.current
-    val animatedX = ((1 - animProgress.value) * currentPos.x + animProgress.value * targetPos.x) * cellWidthPx
-    val animatedY = ((1 - animProgress.value) * currentPos.y + animProgress.value * targetPos.y) * cellHeightPx
+    val animatedX = ((1 - animProgress.value) * prevPos.x + animProgress.value * targetPos.x) * cellWidthPx
+    val animatedY = ((1 - animProgress.value) * prevPos.y + animProgress.value * targetPos.y) * cellHeightPx
 
     Box(
         Modifier
@@ -222,9 +220,20 @@ fun Controls(
             }) { Text("Down") }
 
         }
-        Button(onClick = {
-            robotViewModel.generateRandomTileBlocks()
-        }) { Text("Regen Board") }
+        Row {
+            Button(onClick = {
+                robotViewModel.generateRandomTileBlocks()
+            }) { Text("Regenerate") }
+
+            Button(onClick = {
+                robotViewModel.resetBoard()
+            }) { Text("Reset") }
+
+            Button(onClick = {
+                robotViewModel.solve()
+            }) { Text("Solve") }
+        }
+        Text(robotViewModel.getSelectedRobot()?.id.toString())
 
     }
 }

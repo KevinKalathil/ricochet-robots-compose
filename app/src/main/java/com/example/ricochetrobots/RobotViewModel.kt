@@ -1,6 +1,5 @@
 package com.example.ricochetrobots
 
-import android.service.quicksettings.Tile
 import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
@@ -17,8 +16,9 @@ import kotlin.math.roundToInt
 data class RobotState(
     val id: Int,
     var isSelected: MutableState<Boolean> = mutableStateOf(false),
-    val currentPos: MutableState<Offset> = mutableStateOf(Offset.Zero),
+    val prevPos: MutableState<Offset> = mutableStateOf(Offset.Zero),
     val targetPos: MutableState<Offset> = mutableStateOf(Offset.Zero),
+    val initialPos: MutableState<Offset> = mutableStateOf(Offset.Zero),
     val animProgress: Animatable<Float, AnimationVector1D> = Animatable(1f)
 )
 
@@ -76,21 +76,25 @@ class RobotViewModel : ViewModel() {
 
     private fun generateRandomPositions() {
         robots.forEach { robot ->
-            robot.currentPos.value = Offset(
+            robot.prevPos.value = Offset(
                 x = (0..<columns).random().toFloat(),
                 y = (0..<rows).random().toFloat()
             )
             robot.targetPos.value = Offset(
-                x = robot.currentPos.value.x,
-                y = robot.currentPos.value.y,
+                x = robot.prevPos.value.x,
+                y = robot.prevPos.value.y,
+            )
+            robot.initialPos.value = Offset(
+                x = robot.prevPos.value.x,
+                y = robot.prevPos.value.y,
             )
         }
 
         // ensure manhattan distance between any robot and the target is at least 3
         do {
             targetPos.value = Offset(
-                x = (0..columns).random().toFloat(),
-                y = (0..rows).random().toFloat()
+                x = (0 until columns).random().toFloat(),
+                y = (0 until rows).random().toFloat()
             )
             Log.d("kevin target pos generation", "${targetPos.value}")
         } while (getMinManhattanDistanceToTarget() < 3)
@@ -123,8 +127,8 @@ class RobotViewModel : ViewModel() {
 
         // Ensure robot starting positions are free (no walls blocking)
         robots.forEach { robot ->
-            val col = robot.currentPos.value.x.toInt().coerceIn(0, columns - 1)
-            val row = robot.currentPos.value.y.toInt().coerceIn(0, rows - 1)
+            val col = robot.targetPos.value.x.toInt().coerceIn(0, columns - 1)
+            val row = robot.targetPos.value.y.toInt().coerceIn(0, rows - 1)
             grid[row][col] = 0
         }
 
@@ -140,6 +144,13 @@ class RobotViewModel : ViewModel() {
         }
 
         tileBlockState.gridState.value = grid
+    }
+
+    fun resetBoard() {
+        robots.forEach { robot ->
+            robot.targetPos.value = robot.initialPos.value
+            robot.prevPos.value = robot.initialPos.value
+        }
     }
 
 
@@ -178,8 +189,11 @@ class RobotViewModel : ViewModel() {
         return (noRobotsInSpace and !isWallBlocking)
     }
 
-    fun getNextAvailableBox(direction: Direction): Offset? {
-        val robot = getSelectedRobot() ?: return null
+    fun getNextAvailableBox(direction: Direction, robot: RobotState? = getSelectedRobot()): Offset {
+        if (robot == null) {
+            throw Exception("robot not defined in getNextAvailableBox");
+        }
+
         var x = robot.targetPos.value.x.toInt()
         var y = robot.targetPos.value.y.toInt()
 
@@ -195,50 +209,96 @@ class RobotViewModel : ViewModel() {
         return Offset(x.toFloat(), y.toFloat())
     }
 
+    data class Node(
+        val positions: List<Offset>, // robot positions in this node
+        val moves: List<Pair<Int, Direction>> = emptyList() // moves to reach this state
+    )
 
-//    fun getRightmostAvailableBox(): Float? {
-//        val robot = getSelectedRobot() ?: return null
-//        var x = robot.targetPos.value.x.toInt()
-//        val y = robot.targetPos.value.y.toInt()
-//
-//        // Move right until blocked or end of grid
-//        while (x + 1 < columns && isPositionFree(x + 1, y, robot.id, Direction.Right)) {
-//            x++
-//        }
-//        return x.toFloat()
-//    }
-//
-//    fun getLeftmostAvailableBox(): Float? {
-//        val robot = getSelectedRobot() ?: return null
-//        var x = robot.targetPos.value.x.toInt()
-//        val y = robot.targetPos.value.y.toInt()
-//
-//        while (x - 1 >= 0 && isPositionFree(x - 1, y, robot.id, Direction.Left)) {
-//            x--
-//        }
-//        return x.toFloat()
-//    }
-//
-//    fun getTopmostAvailableBox(): Float? {
-//        val robot = getSelectedRobot() ?: return null
-//        val x = robot.targetPos.value.x.toInt()
-//        var y = robot.targetPos.value.y.toInt()
-//
-//        while (y - 1 >= 0 && isPositionFree(x, y - 1, robot.id, Direction.Up)) {
-//            y--
-//        }
-//        return y.toFloat()
-//    }
-//
-//    fun getBottommostAvailableBox(): Float? {
-//        val robot = getSelectedRobot() ?: return null
-//        val x = robot.targetPos.value.x.toInt()
-//        var y = robot.targetPos.value.y.toInt()
-//
-//        while (y + 1 < rows && isPositionFree(x, y + 1, robot.id, Direction.Down)) {
-//            y++
-//        }
-//        return y.toFloat()
-//    }
+    private fun encodeNode(positions: List<Offset>): Long {
+        val config = BitPackedVisitedConfig(rows, columns, positions.size)
+        positions.forEachIndexed { robotId, pos ->
+            config.setBit(pos.y.toInt(), pos.x.toInt(), robotId)
+        }
+        return config.packToLong()
+    }
+
+    fun solve() {
+        val startPositions = robots.map { it.targetPos.value }
+        val queue = ArrayDeque<Node>()
+        val visited = HashSet<Long>()
+
+        queue.add(Node(startPositions))
+        visited.add(encodeNode(startPositions))
+        Log.d("kevin visited init state", "${encodeNode(startPositions)}")
+
+        while (queue.isNotEmpty()) {
+            val current = queue.removeFirst()
+//            Log.d("kevin solve current", "$current")
+
+            // Check if any robot reached the target
+            if (current.positions.any { it == targetPos.value }) {
+                Log.d("kevin Solve", "Solution found: ${current.moves}")
+                return
+            }
+
+            // Generate all next states
+            for ((robotId, _) in current.positions.withIndex()) {
+                for (dir in Direction.entries) {
+                    val nextPos = getNextAvailableBoxBFS(dir, robotId, current.positions)
+                    if (nextPos != current.positions[robotId]) {
+                        val newPositions = current.positions.toMutableList()
+                        newPositions[robotId] = nextPos
+
+                        val tempState = encodeNode(newPositions)
+
+                        if (tempState in visited) {
+                            continue
+                        }
+                        visited.add(tempState)
+
+                        queue.add(Node(newPositions, current.moves + (robotId to dir)))
+                    }
+                }
+            }
+        }
+
+        Log.d("kevin Solve", "No solution found")
+    }
+
+    // BFS helper functions
+    private fun isPositionFreeBFS(
+        x: Int, y: Int, ignoreRobotId: Int, direction: Direction, positions: List<Offset>
+    ): Boolean {
+        val noRobotsInSpace = positions.withIndex().none { (id, pos) ->
+            id != ignoreRobotId && pos.x.roundToInt() == x && pos.y.roundToInt() == y
+        }
+
+        val isWallBlocking = when (direction) {
+            Direction.Up -> (tileBlockState.gridState.value[y + 1][x] and 1) != 0
+            Direction.Right -> (tileBlockState.gridState.value[y][x] and 8) != 0
+            Direction.Down -> (tileBlockState.gridState.value[y][x] and 1) != 0
+            Direction.Left -> (tileBlockState.gridState.value[y][x + 1] and 8) != 0
+        }
+
+        return noRobotsInSpace && !isWallBlocking
+    }
+
+    private fun getNextAvailableBoxBFS(
+        direction: Direction, robotId: Int, positions: List<Offset>
+    ): Offset {
+        var x = positions[robotId].x.toInt()
+        var y = positions[robotId].y.toInt()
+        val deltaX = direction.dx
+        val deltaY = direction.dy
+
+        while (x + deltaX in 0 until columns &&
+            y + deltaY in 0 until rows &&
+            isPositionFreeBFS(x + deltaX, y + deltaY, robotId, direction, positions)) {
+            x += deltaX
+            y += deltaY
+        }
+
+        return Offset(x.toFloat(), y.toFloat())
+    }
 }
 
