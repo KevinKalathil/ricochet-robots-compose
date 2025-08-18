@@ -1,6 +1,6 @@
 package com.example.ricochetrobots
 
-class BitPackedVisitedConfig(private val rows: Int, private val cols: Int, private val numRobots: Int) {
+class BitPackedVisitedConfig(private val rows: Int, numRobots: Int) {
     private val byteArray = ByteArray(numRobots)
 
     fun setBit(row: Int, col: Int, robotId: Int) {

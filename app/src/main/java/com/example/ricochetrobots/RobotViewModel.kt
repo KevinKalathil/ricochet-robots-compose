@@ -49,6 +49,11 @@ class RobotViewModel : ViewModel() {
     var targetPos: MutableState<Offset> = mutableStateOf(Offset.Zero)
 
     init {
+       initNewPositions()
+
+    }
+
+    fun initNewPositions() {
         generateRandomPositions()
         generateRandomTileBlocks()
         val grid = tileBlockState.gridState.value
@@ -59,7 +64,6 @@ class RobotViewModel : ViewModel() {
             }
         }
         Log.d("Kevin tile grid", "\n$gridString")
-
     }
 
     private fun getMinManhattanDistanceToTarget(): Int {
@@ -215,7 +219,7 @@ class RobotViewModel : ViewModel() {
     )
 
     private fun encodeNode(positions: List<Offset>): Long {
-        val config = BitPackedVisitedConfig(rows, columns, positions.size)
+        val config = BitPackedVisitedConfig(rows, positions.size)
         positions.forEachIndexed { robotId, pos ->
             config.setBit(pos.y.toInt(), pos.x.toInt(), robotId)
         }

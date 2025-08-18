@@ -233,7 +233,12 @@ fun Controls(
                 robotViewModel.solve()
             }) { Text("Solve") }
         }
-        Text(robotViewModel.getSelectedRobot()?.id.toString())
+        Row {
+            Button(onClick = {
+                robotViewModel.initNewPositions()
+            }) { Text("Init") }
+            Text(robotViewModel.getSelectedRobot()?.id.toString())
+        }
 
     }
 }
