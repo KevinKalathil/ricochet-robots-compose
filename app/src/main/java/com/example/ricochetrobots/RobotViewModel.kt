@@ -9,9 +9,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+
+import java.util.UUID
 
 data class RobotState(
     val id: Int,
@@ -48,8 +57,13 @@ class RobotViewModel : ViewModel() {
 
     var targetPos: MutableState<Offset> = mutableStateOf(Offset.Zero)
 
+    private val client = OkHttpClient()
+
+
     init {
        initNewPositions()
+
+        joinServer()
 
     }
 
@@ -64,6 +78,33 @@ class RobotViewModel : ViewModel() {
             }
         }
         Log.d("Kevin tile grid", "\n$gridString")
+    }
+
+    fun joinServer() {
+        val randomUsername = UUID.randomUUID().toString()
+        val url = "http://10.0.2.2:5000/join?username=$randomUsername"
+        val requestBody = RequestBody.create(
+            "application/json".toMediaTypeOrNull(), "")
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .post(requestBody)
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        Log.e("kevin api", "Unexpected code $response")
+                    } else {
+                        val body = response.body?.string()
+                        Log.d("kevin api", "Response: $body")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("kevin api", "Error calling API", e)
+            }
+        }
     }
 
     private fun getMinManhattanDistanceToTarget(): Int {
@@ -237,7 +278,6 @@ class RobotViewModel : ViewModel() {
 
         while (queue.isNotEmpty()) {
             val current = queue.removeFirst()
-//            Log.d("kevin solve current", "$current")
 
             // Check if any robot reached the target
             if (current.positions.any { it == targetPos.value }) {
@@ -254,7 +294,6 @@ class RobotViewModel : ViewModel() {
                         newPositions[robotId] = nextPos
 
                         val tempState = encodeNode(newPositions)
-
                         if (tempState in visited) {
                             continue
                         }

@@ -104,6 +104,7 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
                 // Draw each robot
                 robots.forEach { robot ->
                     Robot(
+                        id = robot.id,
                         animProgress = robot.animProgress,
                         prevPos = robot.prevPos.value,
                         targetPos = robot.targetPos.value,
@@ -136,6 +137,7 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
 
 @Composable
 fun Robot(
+    id: Int,
     animProgress: Animatable<Float, AnimationVector1D>,
     prevPos: Offset,
     targetPos: Offset,
@@ -147,13 +149,27 @@ fun Robot(
     val density = LocalDensity.current
     val animatedX = ((1 - animProgress.value) * prevPos.x + animProgress.value * targetPos.x) * cellWidthPx
     val animatedY = ((1 - animProgress.value) * prevPos.y + animProgress.value * targetPos.y) * cellHeightPx
+    val color = when (id) {
+        0 -> {
+            Color.Cyan
+        }
+        1 -> {
+            Color.Yellow
+        }
+        2 -> {
+            Color.Red
+        }
+        else -> {
+            Color.White
+        }
+    }
 
     Box(
         Modifier
             .offset { IntOffset(animatedX.roundToInt(), animatedY.roundToInt()) }
             .size(with(density) { cellWidthPx.toDp() }, with(density) { cellHeightPx.toDp() })
             .padding(6.dp)
-            .background(if (isSelected) Color.Green else Color.Red)
+            .background(if (isSelected) Color.Green else color)
             .clickable { onClick() }
     )
 }
@@ -174,7 +190,6 @@ fun Target(
             .padding(6.dp)
             .background(Color.Blue)
     )
-
 }
 
 @Composable
@@ -192,14 +207,14 @@ fun Controls(
         ) {
             Button(onClick = {
                 val newPosition = (robotViewModel.getNextAvailableBox(Direction.Left))
-                val newX = newPosition?.x?.coerceAtLeast(0f)
+                val newX = newPosition.x.coerceAtLeast(0f)
                 val newY = targetPos.y
                 moveTo(Offset(newX ?: 0f, newY))
             }) { Text("Left") }
 
             Button(onClick = {
                 val newPosition = (robotViewModel.getNextAvailableBox(Direction.Right))
-                val newX = newPosition?.x?.coerceAtMost(columns - 1f)
+                val newX = newPosition.x.coerceAtMost(columns - 1f)
                 val newY = targetPos.y
                 moveTo(Offset(newX ?: 0f, newY))
             }) { Text("Right") }
@@ -207,14 +222,14 @@ fun Controls(
             Button(onClick = {
                 val newPosition = (robotViewModel.getNextAvailableBox(Direction.Up))
                 val newX = targetPos.x
-                val newY = newPosition?.y?.coerceAtLeast(0f)
+                val newY = newPosition.y.coerceAtLeast(0f)
                 moveTo(Offset(newX, newY ?: 0f))
             }) { Text("Up") }
 
             Button(onClick = {
                 val newPosition = (robotViewModel.getNextAvailableBox(Direction.Down))
                 val newX = targetPos.x
-                val newY = newPosition?.y?.coerceAtMost(rows - 1f)
+                val newY = newPosition.y.coerceAtMost(rows - 1f)
 
                 moveTo(Offset(newX, newY ?: 0f))
             }) { Text("Down") }
@@ -260,7 +275,6 @@ fun GameBoard(rows: Int, columns: Int, tileBlockState: Array<Array<Int>>) {
                             modifier = Modifier
                                 .size(cellSize)
                                 .background(Color.Black)
-//                                .border(2.dp, Color.LightGray)
                                 .drawWithContent {
                                     drawRect(
                                         color = Color.LightGray,
