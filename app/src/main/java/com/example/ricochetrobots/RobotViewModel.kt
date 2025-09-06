@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.min
@@ -19,6 +20,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import org.json.JSONObject
+import io.socket.client.IO as SocketIO
+import io.socket.client.Socket
 
 import java.util.UUID
 
@@ -58,13 +62,13 @@ class RobotViewModel : ViewModel() {
     var targetPos: MutableState<Offset> = mutableStateOf(Offset.Zero)
 
     private val client = OkHttpClient()
+    private lateinit var socket: Socket
 
 
     init {
-       initNewPositions()
-
+        initNewPositions()
         joinServer()
-
+        connectSocket()
     }
 
     fun initNewPositions() {
@@ -105,6 +109,30 @@ class RobotViewModel : ViewModel() {
                 Log.e("kevin api", "Error calling API", e)
             }
         }
+    }
+
+    fun connectSocket() {
+        try {
+            socket = SocketIO.socket("http://10.0.2.2:5000")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        socket.on(Socket.EVENT_CONNECT) {
+            println("Connected to server!")
+        }
+
+        socket.on("game_update") { args ->
+            val data = args[0] as JSONObject
+            println("Game update: ${data}")
+        }
+
+        socket.on("server_msg") { args ->
+            val data = args[0] as JSONObject
+            println("Server msg: ${data}")
+        }
+
+        socket.connect()
     }
 
     private fun getMinManhattanDistanceToTarget(): Int {
