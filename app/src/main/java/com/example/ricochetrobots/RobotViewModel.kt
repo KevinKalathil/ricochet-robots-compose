@@ -19,8 +19,13 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
-
+import org.json.JSONObject
+import io.socket.client.IO as SocketIO
+import io.socket.client.Socket
 import java.util.UUID
+import androidx.navigation.NavController
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 
 data class RobotState(
     val id: Int,
@@ -44,6 +49,8 @@ enum class Direction(val dx: Int, val dy: Int) {
 
 
 class RobotViewModel : ViewModel() {
+    private val _navigationEvents = MutableSharedFlow<String>()
+    val navigationEvents = _navigationEvents.asSharedFlow()
     val columns = 10
     val rows = 10
     var robots by mutableStateOf(
@@ -57,12 +64,17 @@ class RobotViewModel : ViewModel() {
 
     var targetPos: MutableState<Offset> = mutableStateOf(Offset.Zero)
 
+    var isJoiningGame: MutableState<Boolean> = mutableStateOf(false);
+
     private val client = OkHttpClient()
+    private lateinit var socket: Socket
+
 
 
     init {
         initNewPositions()
-        joinServer()
+//        joinServer()
+        connectSocket()
     }
 
     fun initNewPositions() {
@@ -103,6 +115,127 @@ class RobotViewModel : ViewModel() {
                 Log.e("kevin api", "Error calling API", e)
             }
         }
+    }
+
+    fun joinGame() {
+        val data = JSONObject()
+        data.put("username", JSONObject.NULL)
+        isJoiningGame.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            socket.emit("join_game", data)
+        }
+    }
+
+    private fun parseBoard(obj: JSONObject) {
+        // 1. Parse grid
+        val gridJson = obj.getJSONArray("grid")
+        val grid = (0 until gridJson.length()).map { r ->
+            val row = gridJson.getJSONArray(r)
+            (0 until row.length()).map { c -> row.getInt(c) }
+        }
+
+        // Convert List<List<Int>> → Array<Array<Int>>
+        val gridArray = grid.map { it.toTypedArray() }.toTypedArray()
+
+        // 2. Parse robots
+        val robotsJson = obj.getJSONArray("robots")
+        val robotsParsed = (0 until robotsJson.length()).map { i ->
+            val arr = robotsJson.getJSONArray(i)
+            arr.getInt(0) to arr.getInt(1) // (row, col)
+        }
+
+        // 3. Parse target
+        val targetJson = obj.getJSONArray("target")
+        val targetParsed = targetJson.getInt(0) to targetJson.getInt(1)
+
+        // -----------------------------
+        // Update ViewModel state
+        // -----------------------------
+        tileBlockState = TileBlockState(mutableStateOf(gridArray))
+
+        robots = robotsParsed.mapIndexed { index, (row, col) ->
+            RobotState(
+                id = index,
+                prevPos = mutableStateOf(Offset(col.toFloat(), row.toFloat())),
+                targetPos = mutableStateOf(Offset(col.toFloat(), row.toFloat())),
+                initialPos = mutableStateOf(Offset(col.toFloat(), row.toFloat()))
+            )
+        }
+
+        targetPos.value = Offset(targetParsed.second.toFloat(), targetParsed.first.toFloat())
+    }
+
+
+    private fun connectSocket() {
+        try {
+            socket = SocketIO.socket("http://10.0.2.2:5000")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        socket.on(Socket.EVENT_CONNECT) {
+            println("Connected to server!")
+        }
+
+//        socket.on("game_update") { args ->
+//            val data = args[0] as JSONObject
+//            println("Game update: ${data}")
+//        }
+//
+        socket.on("server_msg") { args ->
+            if (args.isEmpty()) return@on
+
+            val data = when {
+                args[0] is String && args.size > 1 -> { // broadcast via room
+                    JSONObject(args[1].toString())
+                }
+                else -> { // direct emit
+                    JSONObject(args[0].toString())
+                }
+            }
+
+            val msg = data.optString("message")
+            println("kevin Server msg: $msg")
+        }
+
+        socket.on("game_waiting") { args ->
+//            val data = args[0] as JSONObject
+            if (args.isNotEmpty()) {
+                val msg = args[0]
+                println("kevin data ${msg}")
+                try {
+                    val json = msg as JSONObject
+                    val msg1 = json.getString("game_waiting")
+                    println("Server msg: $msg1")
+
+                    // Must switch back to main thread for navigation
+                    viewModelScope.launch(Dispatchers.Main) {
+                        _navigationEvents.emit("game")
+                    }
+                } catch (e: Exception) {
+                    println("Failed to parse server message: $msg")
+                }
+            }
+
+            println("game_waiting: ${args}")
+        }
+
+        socket.on("game_start") { args ->
+            isJoiningGame.value = false;
+            println("kevin GAME STARTING with ${args[0]}")
+            val msg = args[0] as JSONObject
+            val board = JSONObject(msg.getString("board"))
+            println("kevin board received $board")
+
+            parseBoard(board)
+
+            // Must switch back to main thread for navigation
+            viewModelScope.launch(Dispatchers.Main) {
+                _navigationEvents.emit("game")
+            }
+        }
+
+        socket.connect()
     }
 
     private fun getMinManhattanDistanceToTarget(): Int {
