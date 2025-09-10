@@ -8,11 +8,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -33,18 +37,10 @@ fun Robot(
     val animatedX = ((1 - animProgress.value) * prevPos.x + animProgress.value * targetPos.x) * cellWidthPx
     val animatedY = ((1 - animProgress.value) * prevPos.y + animProgress.value * targetPos.y) * cellHeightPx
     val color = when (id) {
-        0 -> {
-            Color.Cyan
-        }
-        1 -> {
-            Color.Yellow
-        }
-        2 -> {
-            Color.Red
-        }
-        else -> {
-            Color.White
-        }
+        0 -> Color.Red
+        1 -> Color.Gray
+        2 -> Color.Black
+        else -> Color.Magenta
     }
 
     Box(
@@ -54,6 +50,9 @@ fun Robot(
             .padding(6.dp)
             .background(if (isSelected) Color.Green else color)
             .clickable { onClick() }
-    )
+            , contentAlignment = Alignment.Center
+    ) {
+        Text(text = id.toString(), textAlign = TextAlign.Center, color = Color.White,  fontWeight = FontWeight.SemiBold)
+    }
 }
 

@@ -22,6 +22,11 @@ fun GameBoard(rows: Int, columns: Int, tileBlockState: Array<Array<Int>>) {
         // maxWidth is the total available width for the board
         val cellSize = maxWidth / columns
 
+        // 🎨 Color scheme
+        val cellBackground = Color(0xFFF5F5F5) // light neutral
+        val gridLineColor = Color(0xFFDDDDDD)  // subtle gray
+        val wallColor = Color(0xFF444444)      // strong contrast
+
         Column {
             repeat(rows) { rowIndex ->
                 Row {
@@ -31,51 +36,48 @@ fun GameBoard(rows: Int, columns: Int, tileBlockState: Array<Array<Int>>) {
                         Box(
                             modifier = Modifier
                                 .size(cellSize)
-                                .background(Color.Black)
+                                .background(cellBackground)
                                 .drawWithContent {
+                                    // Draw grid lines
                                     drawRect(
-                                        color = Color.LightGray,
-                                        style = Stroke(width = 4f)
+                                        color = gridLineColor,
+                                        style = Stroke(width = 2f)
                                     )
-                                    val strokeWidth = 15f
+
+                                    val strokeWidth = 12f
                                     val isTopWallBlocked = (value and 1) != 0
                                     val isRightWallBlocked = (value and 2) != 0
                                     val isBottomWallBlocked = (value and 4) != 0
                                     val isLeftWallBlocked = (value and 8) != 0
 
-                                    val borderColor = Color.Magenta
-
-                                    // Top wall: draw if top row or top wall exists
+                                    // Walls
                                     if (isTopWallBlocked) {
                                         drawLine(
-                                            color = borderColor,
+                                            color = wallColor,
                                             start = Offset(0f, 0f),
                                             end = Offset(size.width, 0f),
                                             strokeWidth = strokeWidth
                                         )
                                     }
-                                    // Right wall: only draw if rightmost column OR adjacent cell to the right doesn't have left wall
                                     if (isRightWallBlocked) {
                                         drawLine(
-                                            color = borderColor,
+                                            color = wallColor,
                                             start = Offset(size.width, 0f),
                                             end = Offset(size.width, size.height),
                                             strokeWidth = strokeWidth
                                         )
                                     }
-                                    // Bottom wall: only draw if bottom row OR adjacent cell above doesn't have bottom wall
                                     if (isBottomWallBlocked) {
                                         drawLine(
-                                            color = borderColor,
+                                            color = wallColor,
                                             start = Offset(0f, size.height),
                                             end = Offset(size.width, size.height),
                                             strokeWidth = strokeWidth
                                         )
                                     }
-                                    // Left wall: draw if left column or left wall exists
                                     if (isLeftWallBlocked) {
                                         drawLine(
-                                            color = borderColor,
+                                            color = wallColor,
                                             start = Offset(0f, 0f),
                                             end = Offset(0f, size.height),
                                             strokeWidth = strokeWidth
@@ -83,11 +85,9 @@ fun GameBoard(rows: Int, columns: Int, tileBlockState: Array<Array<Int>>) {
                                     }
                                 }
                         )
-
                     }
                 }
             }
         }
-
     }
 }

@@ -3,6 +3,7 @@ package com.example.ricochetrobots.ui.theme.composable.gameboard
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -19,32 +20,35 @@ fun GameControls(
     targetPos: Offset,
     rows: Int,
     columns: Int,
-    moveTo: (Offset) -> Unit
+    moveTo: (Offset) -> Unit,
+    modifier: Modifier = Modifier.fillMaxWidth()
 ) {
     Column {
+        Spacer(modifier = Modifier.weight(1f)) // pushes content to bottom
+
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = modifier
         ) {
             Button(onClick = {
                 val newPosition = (robotViewModel.getNextAvailableBox(Direction.Left))
                 val newX = newPosition.x.coerceAtLeast(0f)
                 val newY = targetPos.y
-                moveTo(Offset(newX ?: 0f, newY))
+                moveTo(Offset(newX, newY))
             }) { Text("Left") }
 
             Button(onClick = {
                 val newPosition = (robotViewModel.getNextAvailableBox(Direction.Right))
                 val newX = newPosition.x.coerceAtMost(columns - 1f)
                 val newY = targetPos.y
-                moveTo(Offset(newX ?: 0f, newY))
+                moveTo(Offset(newX, newY))
             }) { Text("Right") }
 
             Button(onClick = {
                 val newPosition = (robotViewModel.getNextAvailableBox(Direction.Up))
                 val newX = targetPos.x
                 val newY = newPosition.y.coerceAtLeast(0f)
-                moveTo(Offset(newX, newY ?: 0f))
+                moveTo(Offset(newX, newY))
             }) { Text("Up") }
 
             Button(onClick = {
@@ -52,14 +56,14 @@ fun GameControls(
                 val newX = targetPos.x
                 val newY = newPosition.y.coerceAtMost(rows - 1f)
 
-                moveTo(Offset(newX, newY ?: 0f))
+                moveTo(Offset(newX, newY))
             }) { Text("Down") }
 
         }
         Row {
             Button(onClick = {
-                robotViewModel.generateRandomTileBlocks()
-            }) { Text("Regenerate") }
+                robotViewModel.exitGame()
+            }) { Text("Exit") }
 
             Button(onClick = {
                 robotViewModel.resetBoard()

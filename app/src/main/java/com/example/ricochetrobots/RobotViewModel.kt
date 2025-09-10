@@ -66,20 +66,15 @@ class RobotViewModel : ViewModel() {
 
     var isJoiningGame: MutableState<Boolean> = mutableStateOf(false);
 
-    private val client = OkHttpClient()
     private lateinit var socket: Socket
-
-
 
     init {
         initNewPositions()
-//        joinServer()
         connectSocket()
     }
 
     fun initNewPositions() {
         generateRandomPositions()
-        generateRandomTileBlocks()
         val grid = tileBlockState.gridState.value
         val gridString = buildString {
             for (row in grid) {
@@ -88,33 +83,6 @@ class RobotViewModel : ViewModel() {
             }
         }
         Log.d("Kevin tile grid", "\n$gridString")
-    }
-
-    fun joinServer() {
-        val randomUsername = UUID.randomUUID().toString()
-        val url = "http://10.0.2.2:5000/join?username=$randomUsername"
-        val requestBody = RequestBody.create(
-            "application/json".toMediaTypeOrNull(), "")
-
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val request = Request.Builder()
-                    .url(url)
-                    .post(requestBody)
-                    .build()
-
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        Log.e("kevin api", "Unexpected code $response")
-                    } else {
-                        val body = response.body?.string()
-                        Log.d("kevin api", "Response: $body")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("kevin api", "Error calling API", e)
-            }
-        }
     }
 
     fun joinGame() {
@@ -146,14 +114,11 @@ class RobotViewModel : ViewModel() {
 
         // 3. Parse target
         val targetJson = obj.getJSONArray("target")
-        val targetParsed = targetJson.getInt(0) to targetJson.getInt(1)
+        val targetParsed = targetJson.getInt(1) to targetJson.getInt(0)
 
-        // -----------------------------
-        // Update ViewModel state
-        // -----------------------------
         tileBlockState = TileBlockState(mutableStateOf(gridArray))
 
-        robots = robotsParsed.mapIndexed { index, (row, col) ->
+        robots = robotsParsed.mapIndexed { index, (col, row) ->
             RobotState(
                 id = index,
                 prevPos = mutableStateOf(Offset(col.toFloat(), row.toFloat())),
@@ -164,7 +129,6 @@ class RobotViewModel : ViewModel() {
 
         targetPos.value = Offset(targetParsed.second.toFloat(), targetParsed.first.toFloat())
     }
-
 
     private fun connectSocket() {
         try {
@@ -177,11 +141,6 @@ class RobotViewModel : ViewModel() {
             println("Connected to server!")
         }
 
-//        socket.on("game_update") { args ->
-//            val data = args[0] as JSONObject
-//            println("Game update: ${data}")
-//        }
-//
         socket.on("server_msg") { args ->
             if (args.isEmpty()) return@on
 
@@ -199,7 +158,6 @@ class RobotViewModel : ViewModel() {
         }
 
         socket.on("game_waiting") { args ->
-//            val data = args[0] as JSONObject
             if (args.isNotEmpty()) {
                 val msg = args[0]
                 println("kevin data ${msg}")
@@ -216,8 +174,6 @@ class RobotViewModel : ViewModel() {
                     println("Failed to parse server message: $msg")
                 }
             }
-
-            println("game_waiting: ${args}")
         }
 
         socket.on("game_start") { args ->
@@ -276,56 +232,16 @@ class RobotViewModel : ViewModel() {
         } while (getMinManhattanDistanceToTarget() < 3)
     }
 
-    private fun isWallExisting(wallProbability: Double): Boolean {
-        return (0..100).random() / 100.0 < wallProbability
-    }
-
-    fun generateRandomTileBlocks() {
-        val grid = Array(rows) { Array(columns) { 0 } }
-
-        val wallProbability = 0.1 // chance to add a wall on each side
-
-        for (y in 0 until rows) {
-            for (x in 0 until columns) {
-                var cell = 0
-                // North wall
-                if (y == 0 || isWallExisting(wallProbability)) {
-                    cell = cell or 1
-                }
-                // West wall
-                if (x == 0 || isWallExisting(wallProbability)) {
-                    cell = cell or 8
-                }
-
-                grid[y][x] = cell
-            }
-        }
-
-        // Ensure robot starting positions are free (no walls blocking)
-        robots.forEach { robot ->
-            val col = robot.targetPos.value.x.toInt().coerceIn(0, columns - 1)
-            val row = robot.targetPos.value.y.toInt().coerceIn(0, rows - 1)
-            grid[row][col] = 0
-        }
-
-        // set top/bottom border
-        for (x in 0 until columns) {
-            grid[0][x] = grid[0][x] or 1
-            grid[rows-1][x] = grid[rows-1][x] or 4
-        }
-        // set left/right border
-        for (y in 0 until rows) {
-            grid[y][0] = grid[y][0] or 8
-            grid[y][columns - 1] = grid[y][columns - 1] or 2
-        }
-
-        tileBlockState.gridState.value = grid
-    }
-
     fun resetBoard() {
         robots.forEach { robot ->
             robot.targetPos.value = robot.initialPos.value
             robot.prevPos.value = robot.initialPos.value
+        }
+    }
+
+    fun exitGame() {
+        viewModelScope.launch {
+            _navigationEvents.emit("join")
         }
     }
 

@@ -60,45 +60,45 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
         }
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(10.dp)
-    ) {
-        Box(
-            Modifier
-                .padding(20.dp)
-                .weight(1f)
-                .fillMaxWidth()
-                .aspectRatio(robotViewModel.columns.toFloat() / robotViewModel.rows.toFloat())
-                .onGloballyPositioned { coordinates -> boardSizePx = coordinates.size }
-                .background(Color.LightGray),
-            contentAlignment = Alignment.TopStart
-        ) {
-            GameBoard(robotViewModel.rows, robotViewModel.columns, robotViewModel.tileBlockState.gridState.value)
-            if (boardSizePx.width > 0 && boardSizePx.height > 0) {
-                val cellWidthPx = boardSizePx.width.toFloat() / robotViewModel.columns
-                val cellHeightPx = boardSizePx.height.toFloat() / robotViewModel.rows
-                TargetPosition(robotViewModel.targetPos.value, cellWidthPx = cellWidthPx, cellHeightPx = cellHeightPx)
+    Box(modifier = Modifier.fillMaxSize().padding(20.dp)) {
 
-                // Draw each robot
-                robots.forEach { robot ->
-                    Robot(
-                        id = robot.id,
-                        animProgress = robot.animProgress,
-                        prevPos = robot.prevPos.value,
-                        targetPos = robot.targetPos.value,
-                        cellWidthPx = cellWidthPx,
-                        cellHeightPx = cellHeightPx,
-                        isSelected = robot.isSelected.value
-                    ) {
-                        robots.forEach { it.isSelected.value = false }
-                        robot.isSelected.value = true
+        Column(
+            Modifier
+                .fillMaxSize()
+        ) {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .aspectRatio(robotViewModel.columns.toFloat() / robotViewModel.rows.toFloat())
+                    .onGloballyPositioned { coordinates -> boardSizePx = coordinates.size }
+                    .background(Color.LightGray),
+                contentAlignment = Alignment.TopStart
+            ) {
+                GameBoard(robotViewModel.rows, robotViewModel.columns, robotViewModel.tileBlockState.gridState.value)
+                if (boardSizePx.width > 0 && boardSizePx.height > 0) {
+                    val cellWidthPx = boardSizePx.width.toFloat() / robotViewModel.columns
+                    val cellHeightPx = boardSizePx.height.toFloat() / robotViewModel.rows
+                    TargetPosition(robotViewModel.targetPos.value, cellWidthPx = cellWidthPx, cellHeightPx = cellHeightPx)
+
+                    // Draw each robot
+                    robots.forEach { robot ->
+                        Robot(
+                            id = robot.id,
+                            animProgress = robot.animProgress,
+                            prevPos = robot.prevPos.value,
+                            targetPos = robot.targetPos.value,
+                            cellWidthPx = cellWidthPx,
+                            cellHeightPx = cellHeightPx,
+                            isSelected = robot.isSelected.value
+                        ) {
+                            robots.forEach { it.isSelected.value = false }
+                            robot.isSelected.value = true
+                        }
                     }
                 }
             }
         }
-
         val selectedRobot = robotViewModel.getSelectedRobot()
 
         // Example Controls for the first robot (id=0)
@@ -112,4 +112,6 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
             )
         }
     }
+
 }
+
