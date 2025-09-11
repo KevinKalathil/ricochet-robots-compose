@@ -65,6 +65,7 @@ class RobotViewModel : ViewModel() {
     var targetPos: MutableState<Offset> = mutableStateOf(Offset.Zero)
 
     var isJoiningGame: MutableState<Boolean> = mutableStateOf(false);
+    var isGameOver: MutableState<Boolean> = mutableStateOf(false);
 
     private lateinit var socket: Socket
 
@@ -279,6 +280,17 @@ class RobotViewModel : ViewModel() {
         }
 
         return (noRobotsInSpace and !isWallBlocking)
+    }
+
+    fun checkIsWinningState() {
+        robots.forEach { robot ->
+            if (robot.targetPos.value == targetPos.value) {
+                Log.d("kevin is winning state", "true for robot ${robot.id} and target ${targetPos.value} and current ${robot.targetPos.value}")
+                isGameOver.value = true
+                return
+            }
+        }
+        isGameOver.value = false
     }
 
     fun getNextAvailableBox(direction: Direction, robot: RobotState? = getSelectedRobot()): Offset {

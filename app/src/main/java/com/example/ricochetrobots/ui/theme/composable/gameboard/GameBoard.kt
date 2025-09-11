@@ -41,7 +41,7 @@ fun GameBoard(rows: Int, columns: Int, tileBlockState: Array<Array<Int>>) {
                                     // Draw grid lines
                                     drawRect(
                                         color = gridLineColor,
-                                        style = Stroke(width = 2f)
+                                        style = Stroke(width = 8f)
                                     )
 
                                     val strokeWidth = 12f

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +50,8 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
             robot.animProgress.snapTo(0f)
             robot.animProgress.animateTo(1f, animationSpec = tween(durationMillis = 300))
 
+            robotViewModel.checkIsWinningState()
+
             // Log all robot positions after updating
             robots.forEach { r ->
                 Log.d(
@@ -61,11 +64,14 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
     }
 
     Box(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-
+        if (robotViewModel.isGameOver.value) {
+            Text("Game Over")
+        }
         Column(
             Modifier
                 .fillMaxSize()
         ) {
+
             Box(
                 Modifier
                     .weight(1f)
