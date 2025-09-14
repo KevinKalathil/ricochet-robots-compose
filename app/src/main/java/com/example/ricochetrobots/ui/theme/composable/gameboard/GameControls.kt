@@ -62,7 +62,7 @@ fun GameControls(
         }
         Row {
             Button(onClick = {
-                robotViewModel.exitGame()
+                robotViewModel.leaveGame()
             }) { Text("Exit") }
 
             Button(onClick = {
@@ -72,12 +72,6 @@ fun GameControls(
             Button(onClick = {
                 robotViewModel.solve()
             }) { Text("Solve") }
-        }
-        Row {
-            Button(onClick = {
-                robotViewModel.initNewPositions()
-            }) { Text("Init") }
-            Text(robotViewModel.getSelectedRobot()?.id.toString())
         }
 
     }

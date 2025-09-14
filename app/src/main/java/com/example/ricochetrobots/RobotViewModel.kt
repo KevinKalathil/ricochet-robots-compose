@@ -1,5 +1,6 @@
 package com.example.ricochetrobots
 
+import android.R
 import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
@@ -66,24 +67,13 @@ class RobotViewModel : ViewModel() {
 
     var isJoiningGame: MutableState<Boolean> = mutableStateOf(false);
     var isGameOver: MutableState<Boolean> = mutableStateOf(false);
+    var username: MutableState<String?> = mutableStateOf(null);
+    var gameID: MutableState<Int?> = mutableStateOf(null);
 
     private lateinit var socket: Socket
 
     init {
-        initNewPositions()
         connectSocket()
-    }
-
-    fun initNewPositions() {
-        generateRandomPositions()
-        val grid = tileBlockState.gridState.value
-        val gridString = buildString {
-            for (row in grid) {
-                append(row.joinToString(separator = " ") { it.toString() })
-                append("\n")
-            }
-        }
-        Log.d("Kevin tile grid", "\n$gridString")
     }
 
     fun joinGame() {
@@ -131,7 +121,41 @@ class RobotViewModel : ViewModel() {
         targetPos.value = Offset(targetParsed.second.toFloat(), targetParsed.first.toFloat())
     }
 
-    private fun connectSocket() {
+    fun disconnectFromSocket() {
+        leaveGame()
+        val data = JSONObject()
+        data.put("username", username.value)
+        data.put("game_id", gameID.value)
+        viewModelScope.launch(Dispatchers.IO) {
+            socket.emit("disconnect", data)
+            socket.disconnect()
+            socket.off()
+            socket.close()
+        }
+    }
+
+    fun leaveGame() {
+        viewModelScope.launch {
+            val currentUsername = username.value
+            val currentGameID = gameID.value
+
+            val data = JSONObject().apply {
+                put("username", currentUsername)
+                put("game_id", currentGameID)
+            }
+
+            socket.emit("leave_game", data)
+
+            // Now safe to clear local state
+            username.value = null
+            gameID.value = null
+
+            _navigationEvents.emit("join")
+        }
+    }
+
+
+    fun connectSocket() {
         try {
             socket = SocketIO.socket("http://10.0.2.2:5000")
         } catch (e: Exception) {
@@ -164,13 +188,19 @@ class RobotViewModel : ViewModel() {
                 println("kevin data ${msg}")
                 try {
                     val json = msg as JSONObject
-                    val msg1 = json.getString("game_waiting")
-                    println("Server msg: $msg1")
+                    val gameIdFromJson = json.optString("game_id") // Use optString for safety, or getString if always present
+                    gameID.value = msg.getInt("game_id")
+                    val usernameFromJson = json.optString("username")
+                    username.value = usernameFromJson
+                    val playersConnected = json.optInt("players_connected", 0) // optInt with default
+                    val playersNeeded = json.optInt("players_needed", 0)
 
-                    // Must switch back to main thread for navigation
-                    viewModelScope.launch(Dispatchers.Main) {
-                        _navigationEvents.emit("game")
-                    }
+                    println("kevin Server event: game_waiting")
+                    println("kevin  Game ID: $gameIdFromJson")
+                    println("kevin  Username: $usernameFromJson")
+                    println("kevin  Players Connected: $playersConnected")
+                    println("kevin  Players Needed: $playersNeeded")
+
                 } catch (e: Exception) {
                     println("Failed to parse server message: $msg")
                 }
@@ -182,6 +212,12 @@ class RobotViewModel : ViewModel() {
             println("kevin GAME STARTING with ${args[0]}")
             val msg = args[0] as JSONObject
             val board = JSONObject(msg.getString("board"))
+            val secondUsername = msg.getString("second_username")
+            if (username.value == null) {
+                username.value = secondUsername
+                gameID.value = msg.getInt("game_id")
+            }
+
             println("kevin board received $board")
 
             parseBoard(board)
@@ -190,6 +226,13 @@ class RobotViewModel : ViewModel() {
             viewModelScope.launch(Dispatchers.Main) {
                 _navigationEvents.emit("game")
             }
+        }
+
+        socket.on("end_game") {args ->
+            viewModelScope.launch(Dispatchers.Main) {
+                _navigationEvents.emit("join")
+            }
+            println("kevin GAME ENDING")
         }
 
         socket.connect()
@@ -207,45 +250,12 @@ class RobotViewModel : ViewModel() {
         return minDistance
     }
 
-    private fun generateRandomPositions() {
-        robots.forEach { robot ->
-            robot.prevPos.value = Offset(
-                x = (0..<columns).random().toFloat(),
-                y = (0..<rows).random().toFloat()
-            )
-            robot.targetPos.value = Offset(
-                x = robot.prevPos.value.x,
-                y = robot.prevPos.value.y,
-            )
-            robot.initialPos.value = Offset(
-                x = robot.prevPos.value.x,
-                y = robot.prevPos.value.y,
-            )
-        }
-
-        // ensure manhattan distance between any robot and the target is at least 3
-        do {
-            targetPos.value = Offset(
-                x = (0 until columns).random().toFloat(),
-                y = (0 until rows).random().toFloat()
-            )
-            Log.d("kevin target pos generation", "${targetPos.value}")
-        } while (getMinManhattanDistanceToTarget() < 3)
-    }
-
     fun resetBoard() {
         robots.forEach { robot ->
             robot.targetPos.value = robot.initialPos.value
             robot.prevPos.value = robot.initialPos.value
         }
     }
-
-    fun exitGame() {
-        viewModelScope.launch {
-            _navigationEvents.emit("join")
-        }
-    }
-
 
     // Helper to get currently selected robot
     fun getSelectedRobot(): RobotState? {

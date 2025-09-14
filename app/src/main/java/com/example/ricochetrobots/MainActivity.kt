@@ -37,6 +37,11 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onDestroy() {
+        robotViewModel.disconnectFromSocket()
+        super.onDestroy()
+    }
 }
 
 @Composable
