@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -48,7 +49,8 @@ fun Robot(
             .offset { IntOffset(animatedX.roundToInt(), animatedY.roundToInt()) }
             .size(with(density) { cellWidthPx.toDp() }, with(density) { cellHeightPx.toDp() })
             .padding(6.dp)
-            .background(if (isSelected) Color.Green else color)
+            .background(color)
+            .alpha(if (isSelected) 0.5f else 1f)
             .clickable { onClick() }
             , contentAlignment = Alignment.Center
     ) {

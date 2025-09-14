@@ -70,6 +70,11 @@ class RobotViewModel : ViewModel() {
     var username: MutableState<String?> = mutableStateOf(null);
     var gameID: MutableState<Int?> = mutableStateOf(null);
 
+    var numberOfMoves: MutableState<Int> = mutableStateOf(0);
+
+    var solution: MutableState<List<Pair<Int, Direction>>?> = mutableStateOf(null);
+    var isSolutionDialogOpen: MutableState<Boolean> = mutableStateOf(false);
+
     private lateinit var socket: Socket
 
     init {
@@ -218,6 +223,15 @@ class RobotViewModel : ViewModel() {
                 gameID.value = msg.getInt("game_id")
             }
 
+            val solutionArray = msg.getJSONArray("solution")
+
+            solution.value = (0 until solutionArray.length()).map { i ->
+                val arr = solutionArray.getJSONObject(i)
+                val robotID = arr.getString("robot")
+                val direction = arr.getString("dir")
+                robotID.toInt() to Direction.valueOf(direction)
+            }
+
             println("kevin board received $board")
 
             parseBoard(board)
@@ -238,23 +252,12 @@ class RobotViewModel : ViewModel() {
         socket.connect()
     }
 
-    private fun getMinManhattanDistanceToTarget(): Int {
-        var minDistance = 1000
-        robots.forEach { robot ->
-            minDistance = min(
-                minDistance,
-                (abs(robot.targetPos.value.x - targetPos.value.x) + abs(robot.targetPos.value.y - targetPos.value.y)).toInt()
-            )
-        }
-
-        return minDistance
-    }
-
     fun resetBoard() {
         robots.forEach { robot ->
             robot.targetPos.value = robot.initialPos.value
             robot.prevPos.value = robot.initialPos.value
         }
+        numberOfMoves.value = 0
     }
 
     // Helper to get currently selected robot
@@ -316,96 +319,6 @@ class RobotViewModel : ViewModel() {
 
         // Move right until blocked or end of grid
         while (x + deltaX < columns && y + deltaY < rows && isPositionFree(x + deltaX, y + deltaY, robot.id, direction)) {
-            x += deltaX
-            y += deltaY
-        }
-
-        return Offset(x.toFloat(), y.toFloat())
-    }
-
-    data class Node(
-        val positions: List<Offset>, // robot positions in this node
-        val moves: List<Pair<Int, Direction>> = emptyList() // moves to reach this state
-    )
-
-    private fun encodeNode(positions: List<Offset>): Long {
-        val config = BitPackedVisitedConfig(rows, positions.size)
-        positions.forEachIndexed { robotId, pos ->
-            config.setBit(pos.y.toInt(), pos.x.toInt(), robotId)
-        }
-        return config.packToLong()
-    }
-
-    fun solve() {
-        val startPositions = robots.map { it.targetPos.value }
-        val queue = ArrayDeque<Node>()
-        val visited = HashSet<Long>()
-
-        queue.add(Node(startPositions))
-        visited.add(encodeNode(startPositions))
-        Log.d("kevin visited init state", "${encodeNode(startPositions)}")
-
-        while (queue.isNotEmpty()) {
-            val current = queue.removeFirst()
-
-            // Check if any robot reached the target
-            if (current.positions.any { it == targetPos.value }) {
-                Log.d("kevin Solve", "Solution found: ${current.moves}")
-                return
-            }
-
-            // Generate all next states
-            for ((robotId, _) in current.positions.withIndex()) {
-                for (dir in Direction.entries) {
-                    val nextPos = getNextAvailableBoxBFS(dir, robotId, current.positions)
-                    if (nextPos != current.positions[robotId]) {
-                        val newPositions = current.positions.toMutableList()
-                        newPositions[robotId] = nextPos
-
-                        val tempState = encodeNode(newPositions)
-                        if (tempState in visited) {
-                            continue
-                        }
-                        visited.add(tempState)
-
-                        queue.add(Node(newPositions, current.moves + (robotId to dir)))
-                    }
-                }
-            }
-        }
-
-        Log.d("kevin Solve", "No solution found")
-    }
-
-    // BFS helper functions
-    private fun isPositionFreeBFS(
-        x: Int, y: Int, ignoreRobotId: Int, direction: Direction, positions: List<Offset>
-    ): Boolean {
-        val noRobotsInSpace = positions.withIndex().none { (id, pos) ->
-            id != ignoreRobotId && pos.x.roundToInt() == x && pos.y.roundToInt() == y
-        }
-
-        val isWallBlocking = when (direction) {
-            Direction.Up -> (tileBlockState.gridState.value[y + 1][x] and 1) != 0
-            Direction.Right -> (tileBlockState.gridState.value[y][x] and 8) != 0
-            Direction.Down -> (tileBlockState.gridState.value[y][x] and 1) != 0
-            Direction.Left -> (tileBlockState.gridState.value[y][x + 1] and 8) != 0
-        }
-
-        return noRobotsInSpace && !isWallBlocking
-    }
-
-    private fun getNextAvailableBoxBFS(
-        direction: Direction, robotId: Int, positions: List<Offset>
-    ): Offset {
-        var x = positions[robotId].x.toInt()
-        var y = positions[robotId].y.toInt()
-        val deltaX = direction.dx
-        val deltaY = direction.dy
-
-        while (x + deltaX in 0 until columns &&
-            y + deltaY in 0 until rows &&
-            isPositionFreeBFS(x + deltaX, y + deltaY, robotId, direction, positions)) {
             x += deltaX
             y += deltaY
         }

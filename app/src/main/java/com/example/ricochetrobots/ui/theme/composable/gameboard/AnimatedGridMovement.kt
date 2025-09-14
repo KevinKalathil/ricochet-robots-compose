@@ -4,14 +4,42 @@ import android.annotation.SuppressLint
 import android.util.Log
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowOverflow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,6 +54,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.example.ricochetrobots.RobotViewModel
 import kotlinx.coroutines.launch
+import androidx.compose.ui.window.Dialog
+import com.example.ricochetrobots.Direction
+import kotlinx.coroutines.delay
 
 @SuppressLint("Range")
 @Composable
@@ -33,9 +64,19 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
 
     val robots = robotViewModel.robots
     val coroutineScope = rememberCoroutineScope()
+    var timeLeft by remember { mutableStateOf(20) } // 120 seconds
 
     var boardSizePx by remember { mutableStateOf(IntSize.Zero) }
-
+    LaunchedEffect(Unit) {
+        while (timeLeft > 0 && !robotViewModel.isGameOver.value) {
+            delay(1000)
+            timeLeft--
+        }
+        if (timeLeft == 0) {
+            robotViewModel.isGameOver.value = true
+            robotViewModel.isSolutionDialogOpen.value = true
+        }
+    }
     // Move function for each robot
     fun moveRobot(robotId: Int, newPos: Offset) {
 
@@ -47,6 +88,11 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
         coroutineScope.launch {
             robot.prevPos.value = robot.targetPos.value
             robot.targetPos.value = newPos
+
+            if (robot.targetPos.value != robot.initialPos.value){
+                robotViewModel.numberOfMoves.value++
+            }
+
             robot.animProgress.snapTo(0f)
             robot.animProgress.animateTo(1f, animationSpec = tween(durationMillis = 300))
 
@@ -62,10 +108,43 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
             }
         }
     }
+    CustomDialog(robotViewModel.isSolutionDialogOpen.value, solutionList = robotViewModel.solution.value ?: emptyList(), onDismiss = {
+        robotViewModel.isSolutionDialogOpen.value = false
+    })
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .padding(WindowInsets.safeDrawing.asPaddingValues()) // respect system insets
+        .padding(20.dp)) {
+        Row (modifier = Modifier.fillMaxWidth()){
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(
+                onClick = { robotViewModel.resetBoard() },
+                modifier = Modifier.size(64.dp) // adjust touch target size if needed
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Exit"
+                )
+            }
+            IconButton(
+                onClick = { robotViewModel.leaveGame() },
+                modifier = Modifier.size(64.dp) // adjust touch target size if needed
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Exit"
+                )
+            }
 
-    Box(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-        if (robotViewModel.isGameOver.value) {
-            Text("Game Over")
+        }
+        Row (modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            Text("${timeLeft}s")
+        }
+        Row (modifier = Modifier.fillMaxWidth()){
+            Text("Moves: ${robotViewModel.numberOfMoves.value}")
+            if (robotViewModel.isGameOver.value) {
+                Text("Game Over")
+            }
         }
         Column(
             Modifier
@@ -119,5 +198,66 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
         }
     }
 
+}
+
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun CustomDialog(
+    showDialog: Boolean,
+    solutionList: List<Pair<Int, Direction>>,
+    onDismiss: () -> Unit
+) {
+    if (showDialog) {
+        Dialog(onDismissRequest = { onDismiss() }) {
+            Box(
+                modifier = Modifier
+                    .width(400.dp)
+                    .background(Color.White, shape = RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row {
+                        Text("Optimal Solution")
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { onDismiss() }) {
+                            Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
+                    }
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.Start
+                    ) {
+                        solutionList.forEach { (robotId, direction) ->
+                            val color = when (robotId) {
+                                0 -> Color.Red
+                                1 -> Color.Gray
+                                2 -> Color.Black
+                                else -> Color.Magenta
+                            }
+                            DisabledArrow(direction, color)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DisabledArrow(direction: Direction, tint: Color) {
+    val icon = when (direction) {
+        Direction.Up -> Icons.Default.KeyboardArrowUp
+        Direction.Down -> Icons.Default.KeyboardArrowDown
+        Direction.Left -> Icons.AutoMirrored.Filled.KeyboardArrowLeft
+        Direction.Right -> Icons.AutoMirrored.Filled.KeyboardArrowRight
+    }
+
+    Icon(
+        imageVector = icon,
+        contentDescription = direction.name,
+        tint = tint,
+        modifier = Modifier.size(32.dp)
+    )
 }
 
