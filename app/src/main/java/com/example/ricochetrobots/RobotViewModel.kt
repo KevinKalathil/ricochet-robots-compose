@@ -289,6 +289,7 @@ class RobotViewModel : ViewModel() {
                 isWinningCondition.value = true
                 isWinningConditionDialogOpen.value = true
             }
+
         })
 
         socket.connect()

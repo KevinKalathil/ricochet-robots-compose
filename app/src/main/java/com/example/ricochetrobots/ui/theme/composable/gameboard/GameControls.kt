@@ -114,13 +114,6 @@ fun GameControls(
             }
         }
 
-        Row {
-            Button(onClick = {
-
-                println("kevin solution " + robotViewModel.solution.value)
-                robotViewModel.isSolutionDialogOpen.value = true
-            }) { Text("Show Solution") }
-        }
 
     }
 }

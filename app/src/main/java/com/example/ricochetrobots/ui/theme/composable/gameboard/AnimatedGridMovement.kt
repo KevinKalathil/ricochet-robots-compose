@@ -75,7 +75,6 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
             timeLeft--
         }
         if (timeLeft == 0) {
-            robotViewModel.isWinningCondition.value = true
 //            robotViewModel.isSolutionDialogOpen.value = true
         }
     }
@@ -121,7 +120,7 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
         robotViewModel.username.value ?: "") {
         robotViewModel.isWinningConditionDialogOpen.value = false
     }
-    Box(modifier = Modifier
+    Column(modifier = Modifier
         .fillMaxSize()
         .padding(WindowInsets.safeDrawing.asPaddingValues()) // respect system insets
         .padding(20.dp)) {
@@ -162,10 +161,17 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
             Modifier
                 .fillMaxSize()
         ) {
+            if (robotViewModel.isWinningCondition.value) {
+                Row {
+                    Button(onClick = {
 
+                        println("kevin solution " + robotViewModel.solution.value)
+                        robotViewModel.isSolutionDialogOpen.value = true
+                    }) { Text("Show Solution") }
+                }
+            }
             Box(
                 Modifier
-                    .weight(1f)
                     .fillMaxWidth()
                     .aspectRatio(robotViewModel.columns.toFloat() / robotViewModel.rows.toFloat())
                     .onGloballyPositioned { coordinates -> boardSizePx = coordinates.size }
@@ -195,19 +201,23 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
                     }
                 }
             }
-        }
-        val selectedRobot = robotViewModel.getSelectedRobot()
 
-        // Example Controls for the first robot (id=0)
-        selectedRobot?.targetPos?.let {
-            GameControls(
-                targetPos = it.value,
-                rows = robotViewModel.rows,
-                columns = robotViewModel.columns,
-                moveTo = { newPos -> moveRobot(selectedRobot.id, newPos) },
-                robotViewModel = robotViewModel
-            )
+            val selectedRobot = robotViewModel.getSelectedRobot()
+
+            // Example Controls for the first robot (id=0)
+            selectedRobot?.targetPos?.let {
+                GameControls(
+                    targetPos = it.value,
+                    rows = robotViewModel.rows,
+                    columns = robotViewModel.columns,
+                    moveTo = { newPos -> moveRobot(selectedRobot.id, newPos) },
+                    robotViewModel = robotViewModel
+                )
+            }
         }
+
+
+
     }
 
 }
