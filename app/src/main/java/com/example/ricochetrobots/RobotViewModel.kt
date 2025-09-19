@@ -7,6 +7,7 @@ import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
@@ -66,7 +67,8 @@ class RobotViewModel : ViewModel() {
     var targetPos: MutableState<Offset> = mutableStateOf(Offset.Zero)
 
     var isJoiningGame: MutableState<Boolean> = mutableStateOf(false);
-    var isGameOver: MutableState<Boolean> = mutableStateOf(false);
+    var isWinningCondition: MutableState<Boolean> = mutableStateOf(false);
+    var isWinningConditionDialogOpen: MutableState<Boolean> = mutableStateOf(false);
     var username: MutableState<String?> = mutableStateOf(null);
     var gameID: MutableState<Int?> = mutableStateOf(null);
 
@@ -74,6 +76,10 @@ class RobotViewModel : ViewModel() {
 
     var solution: MutableState<List<Pair<Int, Direction>>?> = mutableStateOf(null);
     var isSolutionDialogOpen: MutableState<Boolean> = mutableStateOf(false);
+
+    var players: MutableState<List<String>> = mutableStateOf(emptyList());
+
+    val playerBestSolution = mutableStateMapOf<String, Int>()
 
     private lateinit var socket: Socket
 
@@ -85,6 +91,8 @@ class RobotViewModel : ViewModel() {
         val data = JSONObject()
         data.put("username", JSONObject.NULL)
         isJoiningGame.value = true
+        numberOfMoves.value = 0
+        isWinningCondition.value = false
         viewModelScope.launch(Dispatchers.IO) {
             socket.emit("join_game", data)
         }
@@ -127,20 +135,16 @@ class RobotViewModel : ViewModel() {
     }
 
     fun disconnectFromSocket() {
-        leaveGame()
         val data = JSONObject()
         data.put("username", username.value)
         data.put("game_id", gameID.value)
         viewModelScope.launch(Dispatchers.IO) {
-            socket.emit("disconnect", data)
-            socket.disconnect()
-            socket.off()
-            socket.close()
+            socket.emit("leave_game", data)
         }
     }
 
     fun leaveGame() {
-        viewModelScope.launch {
+        viewModelScope.launch (Dispatchers.IO){
             val currentUsername = username.value
             val currentGameID = gameID.value
 
@@ -152,11 +156,22 @@ class RobotViewModel : ViewModel() {
             socket.emit("leave_game", data)
 
             // Now safe to clear local state
-            username.value = null
-            gameID.value = null
-
+            resetLocalState()
             _navigationEvents.emit("join")
         }
+    }
+
+    private fun resetLocalState() {
+        username.value = null
+        gameID.value = null
+        players.value = emptyList()
+        solution.value = null
+        isSolutionDialogOpen.value = false
+        isJoiningGame.value = false
+        isWinningCondition.value = false
+        isWinningConditionDialogOpen.value = false
+        numberOfMoves.value = 0
+
     }
 
 
@@ -220,7 +235,18 @@ class RobotViewModel : ViewModel() {
             val secondUsername = msg.getString("second_username")
             if (username.value == null) {
                 username.value = secondUsername
+                println("kevin username set to $secondUsername")
+            }
+            if (gameID.value == null) {
                 gameID.value = msg.getInt("game_id")
+            }
+            val playersArray = msg.getJSONArray("players")
+            players.value = (0 until playersArray.length()).map { i ->
+                playersArray.getString(i)
+            }
+
+            for(player in players.value) {
+                playerBestSolution[player] = 10000
             }
 
             val solutionArray = msg.getJSONArray("solution")
@@ -244,10 +270,26 @@ class RobotViewModel : ViewModel() {
 
         socket.on("end_game") {args ->
             viewModelScope.launch(Dispatchers.Main) {
+                // Now safe to clear local state
+                resetLocalState()
                 _navigationEvents.emit("join")
             }
             println("kevin GAME ENDING")
         }
+
+        socket.on("improved_solution_update", { args ->
+            println("kevin IMPROVED SOLUTION UPDATE")
+            val msg = args[0] as JSONObject
+            val usernameFromJson = msg.optString("username")
+            val currentSolutionLengthFromJSon = msg.optInt("current_solution_length")
+            playerBestSolution[usernameFromJson] = currentSolutionLengthFromJSon
+            println("kevin playerBestSolution: $playerBestSolution")
+
+            if (playerBestSolution[username.value] == solution.value?.size) {
+                isWinningCondition.value = true
+                isWinningConditionDialogOpen.value = true
+            }
+        })
 
         socket.connect()
     }
@@ -258,6 +300,7 @@ class RobotViewModel : ViewModel() {
             robot.prevPos.value = robot.initialPos.value
         }
         numberOfMoves.value = 0
+        isWinningCondition.value = false
     }
 
     // Helper to get currently selected robot
@@ -295,15 +338,30 @@ class RobotViewModel : ViewModel() {
         return (noRobotsInSpace and !isWallBlocking)
     }
 
+    private fun updatePlayersBestSolution(){
+        if (numberOfMoves.value < (playerBestSolution[username.value] ?: 10000)) {
+            playerBestSolution[username.value!!] = numberOfMoves.value
+            viewModelScope.launch(Dispatchers.IO) {
+                val data = JSONObject()
+                data.put("username", username.value)
+                data.put("game_id", gameID.value)
+                data.put("current_solution_length", playerBestSolution[username.value])
+
+                socket.emit("update_best_solution", data);
+            }
+        }
+    }
+
     fun checkIsWinningState() {
         robots.forEach { robot ->
             if (robot.targetPos.value == targetPos.value) {
                 Log.d("kevin is winning state", "true for robot ${robot.id} and target ${targetPos.value} and current ${robot.targetPos.value}")
-                isGameOver.value = true
+                isWinningCondition.value = true
+                updatePlayersBestSolution()
                 return
             }
         }
-        isGameOver.value = false
+        isWinningCondition.value = false
     }
 
     fun getNextAvailableBox(direction: Direction, robot: RobotState? = getSelectedRobot()): Offset {

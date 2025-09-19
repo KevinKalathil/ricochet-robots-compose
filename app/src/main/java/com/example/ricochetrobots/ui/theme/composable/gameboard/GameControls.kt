@@ -79,7 +79,7 @@ fun GameControls(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(24.dp)) // gap between left/right
+                Spacer(modifier = Modifier.width(48.dp)) // gap between left/right
 
                 IconButton(
                     onClick = {
@@ -119,7 +119,7 @@ fun GameControls(
 
                 println("kevin solution " + robotViewModel.solution.value)
                 robotViewModel.isSolutionDialogOpen.value = true
-            }) { Text("Solve") }
+            }) { Text("Show Solution") }
         }
 
     }

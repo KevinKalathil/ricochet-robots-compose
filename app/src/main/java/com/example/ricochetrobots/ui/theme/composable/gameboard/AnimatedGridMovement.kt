@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -67,16 +68,18 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
     var timeLeft by remember { mutableStateOf(20) } // 120 seconds
 
     var boardSizePx by remember { mutableStateOf(IntSize.Zero) }
+
     LaunchedEffect(Unit) {
-        while (timeLeft > 0 && !robotViewModel.isGameOver.value) {
+        while (timeLeft > 0 && !robotViewModel.isWinningCondition.value) {
             delay(1000)
             timeLeft--
         }
         if (timeLeft == 0) {
-            robotViewModel.isGameOver.value = true
-            robotViewModel.isSolutionDialogOpen.value = true
+            robotViewModel.isWinningCondition.value = true
+//            robotViewModel.isSolutionDialogOpen.value = true
         }
     }
+
     // Move function for each robot
     fun moveRobot(robotId: Int, newPos: Offset) {
 
@@ -111,40 +114,49 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
     CustomDialog(robotViewModel.isSolutionDialogOpen.value, solutionList = robotViewModel.solution.value ?: emptyList(), onDismiss = {
         robotViewModel.isSolutionDialogOpen.value = false
     })
+
+    WinnerDialog(
+        robotViewModel.isWinningCondition.value,
+        robotViewModel.isWinningConditionDialogOpen.value,
+        robotViewModel.username.value ?: "") {
+        robotViewModel.isWinningConditionDialogOpen.value = false
+    }
     Box(modifier = Modifier
         .fillMaxSize()
         .padding(WindowInsets.safeDrawing.asPaddingValues()) // respect system insets
         .padding(20.dp)) {
-        Row (modifier = Modifier.fillMaxWidth()){
-            Spacer(modifier = Modifier.weight(1f))
-            IconButton(
-                onClick = { robotViewModel.resetBoard() },
-                modifier = Modifier.size(64.dp) // adjust touch target size if needed
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Exit"
-                )
+        Column (modifier = Modifier.fillMaxWidth()) {
+            Row (modifier = Modifier.fillMaxWidth()){
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = { robotViewModel.resetBoard() },
+                    modifier = Modifier.size(64.dp) // adjust touch target size if needed
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Reset"
+                    )
+                }
+                IconButton(
+                    onClick = { robotViewModel.leaveGame() },
+                    modifier = Modifier.size(64.dp) // adjust touch target size if needed
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Exit"
+                    )
+                }
+
             }
-            IconButton(
-                onClick = { robotViewModel.leaveGame() },
-                modifier = Modifier.size(64.dp) // adjust touch target size if needed
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Exit"
-                )
+            Row (modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                Text("${timeLeft}s")
+            }
+            Row (modifier = Modifier.fillMaxWidth()){
+                Text("Moves: ${robotViewModel.numberOfMoves.value}")
             }
 
-        }
-        Row (modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            Text("${timeLeft}s")
-        }
-        Row (modifier = Modifier.fillMaxWidth()){
-            Text("Moves: ${robotViewModel.numberOfMoves.value}")
-            if (robotViewModel.isGameOver.value) {
-                Text("Game Over")
-            }
+            PlayerList(robotViewModel)
+
         }
         Column(
             Modifier
@@ -200,6 +212,45 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
 
 }
 
+@Composable
+fun PlayerList(robotViewModel: RobotViewModel) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        robotViewModel.players.value.forEach { player ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Green online indicator
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .background(Color.Green, CircleShape)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Player name, append (you) if matches
+                val displayName =
+                    if (player == robotViewModel.username.value) "$player (you)" else player
+
+                Text(displayName, color = Color.Black)
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Text(
+                    "${
+                        if (robotViewModel.playerBestSolution[player] == 10000)
+                            "No solution"
+                        else
+                            robotViewModel.playerBestSolution[player] ?: 0
+                    }"
+                )
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -238,6 +289,36 @@ fun CustomDialog(
                             DisabledArrow(direction, color)
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun WinnerDialog(
+    isWinningCondition: Boolean,
+    isWinningConditionDialogOpen: Boolean,
+    winningPlayer: String,
+    onDismiss: () -> Unit
+) {
+    if (isWinningConditionDialogOpen) {
+        Dialog(onDismissRequest = { onDismiss() }) {
+            Box(
+                modifier = Modifier
+                    .width(400.dp)
+                    .background(Color.White, shape = RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row {
+                        Text("Winner")
+                    }
+                    Box {
+                        Text(winningPlayer)
+                    }
+
                 }
             }
         }
