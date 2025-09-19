@@ -27,100 +27,105 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import com.example.ricochetrobots.Direction
+import com.example.ricochetrobots.RobotState
 import com.example.ricochetrobots.RobotViewModel
 
 @Composable
 fun GameControls(
+    selectedRobot: RobotState?,
     robotViewModel: RobotViewModel,
-    targetPos: Offset,
     rows: Int,
     columns: Int,
-    moveTo: (Offset) -> Unit,
-    modifier: Modifier = Modifier.fillMaxWidth()
+    moveTo: (Offset, Int) -> Unit,
 ) {
+    val targetPos = selectedRobot?.targetPos?.value ?: Offset.Zero
+    val robotID = selectedRobot?.id ?: -1
+
     Column {
         Spacer(modifier = Modifier.weight(1f)) // pushes content to bottom
 
-        val arrowSize = 48.dp  // change this for bigger/smaller arrows
+        val arrowSize = 64.dp  // change this for bigger/smaller arrows
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row {
-                IconButton(
-                    onClick = {
-                        val newPosition = robotViewModel.getNextAvailableBox(Direction.Up)
-                        val newX = targetPos.x
-                        val newY = newPosition.y.coerceAtLeast(0f)
-                        moveTo(Offset(newX, newY))
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.KeyboardArrowUp,
-                        contentDescription = "Up",
-                        modifier = Modifier.size(arrowSize)
-                    )
-                }
+        if (robotViewModel.getSelectedRobot() == null ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                Text("To control a robot, select one by touching it and then use the arrow keys that appear")
             }
-            Row {
-                IconButton(
-                    onClick = {
-                        val newPosition = robotViewModel.getNextAvailableBox(Direction.Left)
-                        val newX = newPosition.x.coerceAtLeast(0f)
-                        val newY = targetPos.y
-                        moveTo(Offset(newX, newY))
+        }
+        else {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row {
+                    IconButton(
+                        onClick = {
+                            val newPosition = robotViewModel.getNextAvailableBox(Direction.Up)
+                            val newX = targetPos.x
+                            val newY = newPosition.y.coerceAtLeast(0f)
+                            moveTo(Offset(newX, newY), robotID)
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.KeyboardArrowUp,
+                            contentDescription = "Up",
+                            modifier = Modifier.size(arrowSize)
+                        )
                     }
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                        contentDescription = "Left",
-                        modifier = Modifier.size(arrowSize)
-                    )
                 }
-
-                Spacer(modifier = Modifier.width(48.dp)) // gap between left/right
-
-                IconButton(
-                    onClick = {
-                        val newPosition = robotViewModel.getNextAvailableBox(Direction.Right)
-                        val newX = newPosition.x.coerceAtMost(columns - 1f)
-                        val newY = targetPos.y
-                        moveTo(Offset(newX, newY))
+                Row {
+                    IconButton(
+                        onClick = {
+                            val newPosition = robotViewModel.getNextAvailableBox(Direction.Left)
+                            val newX = newPosition.x.coerceAtLeast(0f)
+                            val newY = targetPos.y
+                            moveTo(Offset(newX, newY), robotID)
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            contentDescription = "Left",
+                            modifier = Modifier.size(arrowSize)
+                        )
                     }
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = "Right",
-                        modifier = Modifier.size(arrowSize)
-                    )
+
+                    Spacer(modifier = Modifier.width(48.dp)) // gap between left/right
+
+                    IconButton(
+                        onClick = {
+                            val newPosition = robotViewModel.getNextAvailableBox(Direction.Right)
+                            val newX = newPosition.x.coerceAtMost(columns - 1f)
+                            val newY = targetPos.y
+                            moveTo(Offset(newX, newY), robotID)
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = "Right",
+                            modifier = Modifier.size(arrowSize)
+                        )
+                    }
                 }
-            }
-            Row {
-                IconButton(
-                    onClick = {
-                        val newPosition = robotViewModel.getNextAvailableBox(Direction.Down)
-                        val newX = targetPos.x
-                        val newY = newPosition.y.coerceAtMost(rows - 1f)
-                        moveTo(Offset(newX, newY))
+                Row {
+                    IconButton(
+                        onClick = {
+                            val newPosition = robotViewModel.getNextAvailableBox(Direction.Down)
+                            val newX = targetPos.x
+                            val newY = newPosition.y.coerceAtMost(rows - 1f)
+                            moveTo(Offset(newX, newY), robotID)
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.KeyboardArrowDown,
+                            contentDescription = "Down",
+                            modifier = Modifier.size(arrowSize)
+                        )
                     }
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.KeyboardArrowDown,
-                        contentDescription = "Down",
-                        modifier = Modifier.size(arrowSize)
-                    )
                 }
             }
         }
 
-        Row {
-            Button(onClick = {
 
-                println("kevin solution " + robotViewModel.solution.value)
-                robotViewModel.isSolutionDialogOpen.value = true
-            }) { Text("Show Solution") }
-        }
+
 
     }
 }

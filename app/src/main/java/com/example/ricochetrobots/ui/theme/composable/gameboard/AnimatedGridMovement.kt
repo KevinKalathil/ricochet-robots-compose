@@ -42,6 +42,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -65,7 +66,7 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
 
     val robots = robotViewModel.robots
     val coroutineScope = rememberCoroutineScope()
-    var timeLeft by remember { mutableStateOf(20) } // 120 seconds
+    var timeLeft by remember { mutableIntStateOf(120) } // 2 minutes
 
     var boardSizePx by remember { mutableStateOf(IntSize.Zero) }
 
@@ -74,10 +75,9 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
             delay(1000)
             timeLeft--
         }
-        if (timeLeft == 0) {
-            robotViewModel.isWinningCondition.value = true
-//            robotViewModel.isSolutionDialogOpen.value = true
-        }
+//        if (timeLeft == 0) {
+////            robotViewModel.isSolutionDialogOpen.value = true
+//        }
     }
 
     // Move function for each robot
@@ -92,7 +92,7 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
             robot.prevPos.value = robot.targetPos.value
             robot.targetPos.value = newPos
 
-            if (robot.targetPos.value != robot.initialPos.value){
+            if (robot.targetPos.value != robot.prevPos.value){
                 robotViewModel.numberOfMoves.value++
             }
 
@@ -157,14 +157,21 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
 
             PlayerList(robotViewModel)
 
+            if (robotViewModel.isWinningCondition.value){
+                Button(onClick = {
+
+                    println("kevin solution " + robotViewModel.solution.value)
+                    robotViewModel.isSolutionDialogOpen.value = true
+                }) { Text("Show Solution") }
+            }
         }
         Column(
             Modifier
                 .fillMaxSize()
         ) {
-
             Box(
                 Modifier
+                    .padding(top = 50.dp)
                     .weight(1f)
                     .fillMaxWidth()
                     .aspectRatio(robotViewModel.columns.toFloat() / robotViewModel.rows.toFloat())
@@ -199,15 +206,13 @@ fun AnimatedGridMovement(robotViewModel: RobotViewModel) {
         val selectedRobot = robotViewModel.getSelectedRobot()
 
         // Example Controls for the first robot (id=0)
-        selectedRobot?.targetPos?.let {
-            GameControls(
-                targetPos = it.value,
-                rows = robotViewModel.rows,
-                columns = robotViewModel.columns,
-                moveTo = { newPos -> moveRobot(selectedRobot.id, newPos) },
-                robotViewModel = robotViewModel
-            )
-        }
+        GameControls(
+            selectedRobot = selectedRobot,
+            rows = robotViewModel.rows,
+            columns = robotViewModel.columns,
+            moveTo = { newPos, robotID -> moveRobot(robotID, newPos) },
+            robotViewModel = robotViewModel
+        )
     }
 
 }
